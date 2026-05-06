@@ -1,0 +1,642 @@
+:root {
+  color: #f6efe1;
+  background: #0b1220;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --bg: #0b1220;
+  --panel: #162033;
+  --panel-2: #1d293d;
+  --line: rgba(245, 233, 200, 0.16);
+  --gold: #c9972b;
+  --gold-2: #f2d16b;
+  --red: #d84c36;
+  --green: #60b38a;
+  --text: #f7f1e7;
+  --muted: #aeb8c8;
+  --danger: #ef6a5b;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(201, 151, 43, 0.16), transparent 22rem),
+    linear-gradient(180deg, #121725 0%, #0b1220 42%, #111827 100%);
+}
+
+button,
+select {
+  font: inherit;
+}
+
+button {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  background: #223047;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+.appShell {
+  min-height: 100vh;
+  max-width: 760px;
+  margin: 0 auto;
+  padding-bottom: calc(178px + var(--safe-bottom));
+  position: relative;
+}
+
+.gameHeader {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: 112px 1fr;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(11, 18, 32, 0.94);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(12px);
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--gold-2);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.gameHeader h1 {
+  margin: 2px 0 0;
+  font-size: 1.15rem;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+
+.resourceGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+  margin: 0;
+}
+
+.resourceGrid div {
+  min-width: 0;
+  padding: 5px 4px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.045);
+  text-align: center;
+}
+
+.resourceGrid dt {
+  color: var(--muted);
+  font-size: 0.65rem;
+}
+
+.resourceGrid dd {
+  margin: 1px 0 0;
+  color: var(--gold-2);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.mainArea {
+  padding: 10px 10px 0;
+}
+
+.toastLine {
+  margin-bottom: 8px;
+  padding: 9px 10px;
+  border: 1px solid rgba(201, 151, 43, 0.3);
+  border-radius: 8px;
+  background: rgba(201, 151, 43, 0.14);
+  color: #f8e7ae;
+  font-size: 0.88rem;
+}
+
+.tabBar {
+  position: sticky;
+  top: 66px;
+  z-index: 15;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 8px 0;
+  background: rgba(11, 18, 32, 0.92);
+}
+
+.tabBar button,
+.focusSelect button,
+.difficultyRow button {
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.tabBar button.isSelected,
+.focusSelect button.isSelected,
+.difficultyRow button.isSelected {
+  border-color: rgba(242, 209, 107, 0.72);
+  color: var(--text);
+  background: linear-gradient(180deg, rgba(201, 151, 43, 0.38), rgba(201, 151, 43, 0.14));
+}
+
+.tabPanel {
+  display: grid;
+  gap: 10px;
+}
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(29, 41, 61, 0.98), rgba(17, 24, 39, 0.98));
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+  padding: 12px;
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.sectionTitle h2 {
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: 0;
+}
+
+.sectionTitle span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.mapGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.regionCard {
+  position: relative;
+  min-height: 108px;
+  padding: 11px 8px 8px;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--faction-color) 24%, #172033), rgba(18, 27, 43, 0.94));
+  text-align: left;
+}
+
+.regionCard.isSelected {
+  border-color: var(--gold-2);
+  box-shadow: inset 0 0 0 1px rgba(242, 209, 107, 0.7), 0 0 0 2px rgba(201, 151, 43, 0.16);
+}
+
+.regionOwner {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: var(--faction-color);
+}
+
+.regionCard strong,
+.regionCard small,
+.regionCard .regionMeta,
+.regionCard em {
+  display: block;
+  min-width: 0;
+}
+
+.regionCard strong {
+  font-size: 0.98rem;
+}
+
+.regionCard small,
+.regionMeta {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.regionCard em {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  color: var(--gold-2);
+  background: rgba(0, 0, 0, 0.24);
+  font-size: 0.68rem;
+  font-style: normal;
+}
+
+.regionSummary,
+.statGrid,
+.battleStats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.regionSummary span,
+.statGrid span,
+.battleStats div {
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.detailsBlock {
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.detailsBlock summary {
+  min-height: 36px;
+  cursor: pointer;
+  color: var(--gold-2);
+  font-weight: 700;
+}
+
+.neighborList,
+.hireList,
+.saveGrid,
+.difficultyRow {
+  display: grid;
+  gap: 8px;
+}
+
+.neighborList {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.neighborList button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-inline: 8px;
+  text-align: left;
+}
+
+.colorDot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+}
+
+.miniList p {
+  margin: 3px 0;
+  color: var(--muted);
+}
+
+.hireBox {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid rgba(96, 179, 138, 0.36);
+  border-radius: 8px;
+  background: rgba(96, 179, 138, 0.1);
+}
+
+.officerList {
+  display: grid;
+  gap: 8px;
+}
+
+.officerCard {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  min-height: 126px;
+  padding: 10px;
+  text-align: left;
+  background: linear-gradient(180deg, rgba(34, 48, 71, 0.96), rgba(22, 32, 51, 0.96));
+}
+
+.officerCard.isSelected {
+  border-color: var(--gold-2);
+  box-shadow: inset 0 0 0 1px rgba(242, 209, 107, 0.64);
+}
+
+.officerTop,
+.meterLine,
+.factionRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.officerTop strong {
+  font-size: 1rem;
+}
+
+.officerTop span,
+.meterLine,
+.officerCard small {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.statGrid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.statGrid span {
+  padding: 6px 4px;
+  text-align: center;
+}
+
+.factionList {
+  display: grid;
+  gap: 8px;
+}
+
+.factionRow {
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.factionRow div {
+  min-width: 0;
+  flex: 1;
+}
+
+.factionRow strong,
+.factionRow small {
+  display: block;
+}
+
+.factionRow small {
+  color: var(--muted);
+}
+
+.factionRow.isDefeated {
+  opacity: 0.52;
+}
+
+.logList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.logItem {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.logItem span {
+  color: var(--gold-2);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.logItem p {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.log-warning {
+  border-color: rgba(239, 106, 91, 0.42);
+}
+
+.log-battle {
+  border-color: rgba(216, 76, 54, 0.42);
+}
+
+.currentTarget {
+  position: sticky;
+  bottom: calc(158px + var(--safe-bottom));
+  z-index: 12;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(242, 209, 107, 0.28);
+  border-radius: 8px;
+  background: rgba(12, 18, 30, 0.88);
+  backdrop-filter: blur(10px);
+}
+
+.currentTarget span,
+.currentTarget small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.actionPanel {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 30;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 8px 10px calc(10px + var(--safe-bottom));
+  border-top: 1px solid var(--line);
+  background: rgba(11, 18, 32, 0.96);
+  backdrop-filter: blur(14px);
+}
+
+.focusSelect {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 7px;
+}
+
+.focusSelect button {
+  min-height: 36px;
+  font-size: 0.78rem;
+}
+
+.actionGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.actionGrid button {
+  min-height: 46px;
+  font-weight: 800;
+}
+
+.actionGrid .endTurnButton {
+  grid-column: span 2;
+  color: #111827;
+  border-color: rgba(242, 209, 107, 0.9);
+  background: linear-gradient(180deg, #f2d16b, #c9972b);
+}
+
+.noticeText {
+  margin: 0 0 10px;
+  color: var(--gold-2);
+}
+
+.difficultyRow {
+  grid-template-columns: repeat(3, 1fr);
+  margin-bottom: 10px;
+}
+
+.saveGrid {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.dangerButton {
+  border-color: rgba(239, 106, 91, 0.55);
+  color: #ffe4df;
+  background: rgba(216, 76, 54, 0.26);
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(3, 7, 18, 0.74);
+}
+
+.battleModal,
+.tutorialModal,
+.resultModal {
+  width: min(100%, 430px);
+  max-height: min(86vh, 720px);
+  overflow: auto;
+  border: 1px solid rgba(242, 209, 107, 0.3);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #263349, #111827);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.46);
+  padding: 18px;
+}
+
+.battleModal {
+  animation: battleIn 180ms ease-out;
+}
+
+.battleModal h2,
+.tutorialModal h2,
+.resultModal h2 {
+  margin: 4px 0 12px;
+  font-size: 1.4rem;
+}
+
+.battleBanner {
+  margin: 8px 0 14px;
+  padding: 12px;
+  border-radius: 8px;
+  color: #111827;
+  background: linear-gradient(90deg, var(--gold-2), #fff1b8);
+  text-align: center;
+  font-weight: 900;
+}
+
+.battleStats {
+  margin: 0;
+}
+
+.battleStats dt {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.battleStats dd {
+  margin: 3px 0 0;
+  color: var(--text);
+  font-weight: 800;
+}
+
+.skillList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.skillList span {
+  padding: 5px 7px;
+  border-radius: 999px;
+  color: #fff3cc;
+  background: rgba(201, 151, 43, 0.2);
+  font-size: 0.76rem;
+}
+
+.hintText {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.primaryButton {
+  width: 100%;
+  margin-top: 10px;
+  color: #111827;
+  border-color: rgba(242, 209, 107, 0.9);
+  background: linear-gradient(180deg, #f2d16b, #c9972b);
+  font-weight: 900;
+}
+
+.tutorialModal ol {
+  margin: 0;
+  padding-left: 1.35rem;
+  color: var(--text);
+  line-height: 1.8;
+}
+
+@keyframes battleIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

@@ -1,0 +1,68 @@
+@media (max-width: 390px) {
+  .gameHeader {
+    grid-template-columns: 96px 1fr;
+    padding-inline: 8px;
+  }
+
+  .gameHeader h1 {
+    font-size: 1rem;
+  }
+
+  .resourceGrid {
+    gap: 4px;
+  }
+
+  .resourceGrid dd {
+    font-size: 0.76rem;
+  }
+
+  .mainArea {
+    padding-inline: 8px;
+  }
+
+  .regionCard {
+    min-height: 102px;
+    padding-inline: 7px;
+  }
+
+  .regionCard strong {
+    font-size: 0.9rem;
+  }
+
+  .actionGrid {
+    gap: 5px;
+  }
+
+  .actionGrid button {
+    font-size: 0.82rem;
+  }
+
+  .panel {
+    padding: 10px;
+  }
+}
+
+@media (min-width: 640px) {
+  .tabPanel {
+    grid-template-columns: 1.2fr 0.8fr;
+    align-items: start;
+  }
+
+  .tabPanel > .panel:only-child {
+    grid-column: 1 / -1;
+  }
+
+  .officerList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
