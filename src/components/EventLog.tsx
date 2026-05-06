@@ -4,17 +4,31 @@ interface EventLogProps {
   logs: ActionLog[];
 }
 
+const typeLabel: Record<string, string> = {
+  battle:  '⚔',
+  action:  '▶',
+  economy: '⊕',
+  event:   '✦',
+  system:  '◆',
+  warning: '！',
+  save:    '□',
+};
+
 export function EventLog({ logs }: EventLogProps) {
+  const sorted = [...logs].reverse();
   return (
     <section className="panel">
       <div className="sectionTitle">
-        <h2>軍記</h2>
+        <h2>軍 記</h2>
         <span>{logs.length}件</span>
       </div>
       <ol className="logList">
-        {logs.map((log) => (
+        {sorted.map((log) => (
           <li className={`logItem log-${log.type}`} key={log.id}>
-            <span>{log.turn}月</span>
+            <div className="logTurn">
+              <div style={{ fontSize: '0.9rem' }}>{typeLabel[log.type] ?? '─'}</div>
+              <div>{log.turn}月</div>
+            </div>
             <p>{log.message}</p>
           </li>
         ))}

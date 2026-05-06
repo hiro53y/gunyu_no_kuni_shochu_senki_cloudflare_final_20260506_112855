@@ -25,15 +25,15 @@ export function SaveLoadPanel({
   return (
     <section className="panel">
       <div className="sectionTitle">
-        <h2>保存</h2>
-        <span>{state.gameStatus === 'playing' ? '進行中' : '終了'}</span>
+        <h2>記録</h2>
+        <span>{state.gameStatus === 'playing' ? `第 ${state.turn} 月 進行中` : '終了'}</span>
       </div>
-      {notice && <p className="noticeText">{notice}</p>}
-      <div className="difficultyRow">
+
+      <div className="difficultyRow" style={{ marginBottom: 8 }}>
         {(Object.keys(difficultyLabel) as Difficulty[]).map((item) => (
           <button
-            className={difficulty === item ? 'isSelected' : ''}
             key={item}
+            className={`diffBtn${difficulty === item ? ' isSelected' : ''}`}
             onClick={() => onDifficultyChange(item)}
             type="button"
           >
@@ -41,21 +41,19 @@ export function SaveLoadPanel({
           </button>
         ))}
       </div>
-      <div className="saveGrid">
-        <button onClick={onSave} type="button">
-          手動セーブ
-        </button>
-        <button onClick={onLoad} type="button">
-          ロード
-        </button>
-        <button onClick={onNewGame} type="button">
-          ニューゲーム
-        </button>
-        <button className="dangerButton" onClick={onDelete} type="button">
-          セーブ削除
-        </button>
+
+      <div className="saveBtnRow" style={{ marginBottom: 6 }}>
+        <button className="saveBtn" onClick={onSave} type="button">💾 手動セーブ</button>
+        <button className="saveBtn" onClick={onLoad} type="button">📂 ロード</button>
       </div>
-      <small>ターン進行時は自動セーブされます。</small>
+      <div className="saveBtnRow">
+        <button className="saveBtn" onClick={onNewGame} type="button">✦ ニューゲーム</button>
+        <button className="saveBtn dangerBtn" onClick={onDelete} type="button">🗑 セーブ削除</button>
+      </div>
+
+      <p style={{ fontSize: '0.72rem', color: 'var(--muted)', marginTop: 8, marginBottom: 0 }}>
+        ターン進行時は自動セーブされます。
+      </p>
     </section>
   );
 }

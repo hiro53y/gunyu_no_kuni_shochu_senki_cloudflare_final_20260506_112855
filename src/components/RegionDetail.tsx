@@ -1,5 +1,6 @@
 import { terrainLabel } from '../data/names';
 import { estimateRegionDefense, getAvailableRonin, getRegionOfficers } from '../engine/selectors';
+import { getPortraitStyle } from './portraitUtils';
 import type { GameState } from '../types/game';
 
 interface RegionDetailProps {
@@ -10,57 +11,99 @@ interface RegionDetailProps {
 
 export function RegionDetail({ state, onSelectRegion, onHire }: RegionDetailProps) {
   const region = state.regions[state.selectedRegionId];
-  const faction = state.factions[region.ownerFactionId];
+  if (!region) return null;
+
+  const faction  = state.factions[region.ownerFactionId];
   const officers = getRegionOfficers(state, region.id);
-  const ronin = getAvailableRonin(state).filter((officer) => officer.locationRegionId === region.id);
-  const defense = estimateRegionDefense(state, region.id);
+  const ronin    = getAvailableRonin(state).filter((o) => o.locationRegionId === region.id);
+  const defense  = estimateRegionDefense(state, region.id);
+  const hpRatio  = region.castleHp / region.maxCastleHp;
+  const hpClass  = hpRatio > 0.6 ? 'high' : hpRatio > 0.3 ? 'mid' : '';
 
   return (
-    <section className="panel">
-      <div className="sectionTitle">
-        <h2>{region.name}</h2>
-        <span style={{ color: faction.color }}>{faction.name}</span>
-      </div>
-      <div className="regionSummary">
-        <span>{terrainLabel[region.terrain]}</span>
-        <span>石高 {region.riceYield}</span>
-        <span>治安 {region.publicOrder}</span>
-        <span>
-          城 {region.castleHp}/{region.maxCastleHp}
-        </span>
-        <span>守備兵 {region.localTroops}</span>
-        <span>防衛目安 {defense}</span>
+    <section className="regionDetail">
+      <div className="regionDetailHeader">
+        <div>
+          <h2>{region.name}</h2>
+          <p className="regionFaction" style={{ color: faction?.color, margin: 0 }}>{faction?.name}</p>
+        </div>
+        <span className="terrainBadge">{terrainLabel[region.terrain]}</span>
       </div>
 
-      <details className="detailsBlock" open>
-        <summary>隣接地域</summary>
-        <div className="neighborList">
-          {region.neighbors.map((neighborId) => {
-            const neighbor = state.regions[neighborId];
-            const owner = state.factions[neighbor.ownerFactionId];
+      <div className="regionStats">
+        {[
+          { label: '石高',   val: String(region.riceYield), cls: '' },
+          { label: '治安',   val: String(region.publicOrder), cls: region.publicOrder < 40 ? 'danger' : region.publicOrder >= 70 ? 'good' : '' },
+          { label: '守備兵', val: region.localTroops.toLocaleString(), cls: '' },
+          { label: '防衛力', val: defense.toLocaleString(), cls: '' },
+          { label: '開発度', val: String(region.developmentLevel), cls: '' },
+        ].map(({ label, val, cls }) => (
+          <div key={label} className="regionStatItem">
+            <span className="rLabel">{label}</span>
+            <div className="rValWrap">
+              <span className={`rVal${cls ? ' ' + cls : ''}`}>{val}</span>
+            </div>
+          </div>
+        ))}
+        <div className="regionStatItem">
+          <span className="rLabel">城耐久</span>
+          <div className="rValWrap">
+            <span className={`rVal${hpRatio < 0.3 ? ' danger' : ''}`}>
+              {region.castleHp}/{region.maxCastleHp}
+            </span>
+            <div className="castleHpBar">
+              <div className={`castleHpFill ${hpClass}`} style={{ width: `${hpRatio * 100}%` }} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {officers.length > 0 && (
+        <div className="regionOfficers">
+          <h3>所在武将</h3>
+          {officers.map((officer) => {
+            const { bg, kanji } = getPortraitStyle(officer);
             return (
-              <button key={neighbor.id} onClick={() => onSelectRegion(neighbor.id)} type="button">
-                <span className="colorDot" style={{ background: owner.color }} />
-                {neighbor.name}
-              </button>
+              <div key={officer.id} className="officerMiniRow">
+                <div className="officerMiniPortrait" style={{ '--portrait-bg': bg } as React.CSSProperties}>
+                  {kanji}
+                </div>
+                <span className="officerMiniName">{officer.name}</span>
+                <span className="officerMiniTroops">兵 {officer.troops.toLocaleString()}</span>
+              </div>
             );
           })}
         </div>
-      </details>
+      )}
 
-      <details className="detailsBlock">
-        <summary>所在武将</summary>
-        <div className="miniList">
-          {officers.length === 0 ? <p>武将なし</p> : officers.map((officer) => <p key={officer.id}>{officer.name}</p>)}
-        </div>
-      </details>
+      <div className="regionActions" style={{ flexWrap: 'wrap' }}>
+        {region.neighbors.map((nid) => {
+          const n  = state.regions[nid];
+          const nf = state.factions[n?.ownerFactionId];
+          if (!n) return null;
+          return (
+            <button
+              key={nid}
+              className="hireButton"
+              onClick={() => onSelectRegion(nid)}
+              type="button"
+              style={{
+                borderColor: `${nf?.color ?? 'var(--border)'}55`,
+                color: nf?.color ?? 'var(--text)',
+                background: `${nf?.color ?? '#ffffff'}0a`,
+              }}
+            >
+              {n.name}
+            </button>
+          );
+        })}
+      </div>
 
       {ronin.length > 0 && (
-        <div className="hireBox">
-          <strong>登用候補</strong>
-          {ronin.map((officer) => (
-            <button key={officer.id} onClick={() => onHire(officer.id)} type="button">
-              {officer.name}を登用
+        <div className="regionActions">
+          {ronin.map((o) => (
+            <button key={o.id} className="hireButton" onClick={() => onHire(o.id)} type="button">
+              {o.name}を登用
             </button>
           ))}
         </div>
