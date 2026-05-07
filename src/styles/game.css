@@ -306,10 +306,10 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 
 /* ══════════════════════════════════════════════════════
-   SENGOKU RANCE STYLE BATTLE SCREEN
+   ORIGINAL TACTICAL BATTLE SCREEN
    ══════════════════════════════════════════════════════ */
 
-.ranceBattle {
+.battleStage {
   position: fixed;
   inset: 0;
   display: flex;
@@ -951,7 +951,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 
 /* ══════════════════════════════════════════════════════
-   MAP SCREEN VISUAL ENHANCEMENTS (Rance-style)
+   MAP SCREEN VISUAL ENHANCEMENTS
    ══════════════════════════════════════════════════════ */
 
 /* Map tiles: more opaque faction colors */
@@ -991,7 +991,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   opacity: 0.85;
 }
 
-/* Command bar: Rance bottom-bar style */
+/* Command bar: compact tactical style */
 .commandBar {
   background: linear-gradient(180deg, #0e1520 0%, #080e18 100%) !important;
   border-top: 2px solid #1e2a44 !important;
@@ -1334,4 +1334,776 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 .hireBtn:hover {
   background: rgba(240,192,64,0.22);
+}
+
+/* ============================================================
+   Battle screen — original mini-character tactical stage
+   ============================================================ */
+
+.battleStage {
+  background:
+    radial-gradient(ellipse at 50% 15%, rgba(95,78,36,0.18), transparent 52%),
+    linear-gradient(180deg, #070912 0%, #07090d 100%) !important;
+}
+
+.rTopHud {
+  height: 44px !important;
+  background: linear-gradient(180deg, #151b29 0%, #0b1019 100%) !important;
+  border-bottom: 1px solid rgba(240,192,64,0.25) !important;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.36);
+}
+
+.rHudLabel {
+  color: #a8c5e6 !important;
+  font-weight: 700;
+}
+
+.rHudLabel.def { color: #f0a4a0 !important; }
+
+.rHudSeg {
+  height: 12px;
+  border-radius: 2px !important;
+}
+
+.rHudSeg.filled-atk {
+  background: linear-gradient(180deg, #5bb2ff, #1d70c2) !important;
+}
+
+.rHudSeg.filled-def {
+  background: linear-gradient(180deg, #ff6a85, #c61343) !important;
+}
+
+.rHudCenter {
+  min-width: 108px !important;
+}
+
+.rHudTitle {
+  font-size: 0.66rem !important;
+  color: #f3d579 !important;
+  text-shadow: 0 1px 0 #000;
+}
+
+.rHudRound {
+  color: #99a4b8 !important;
+}
+
+.rFieldArea {
+  height: min(36dvh, 264px) !important;
+  min-height: 212px;
+  background:
+    linear-gradient(180deg, rgba(14,18,25,0.36) 0%, transparent 26%),
+    radial-gradient(ellipse at 18% 68%, rgba(74,109,58,0.26) 0%, transparent 32%),
+    radial-gradient(ellipse at 82% 68%, rgba(123,50,55,0.22) 0%, transparent 34%),
+    linear-gradient(180deg, #1a2430 0%, #25354a 28%, #4c4232 29%, #806b43 55%, #66583a 100%) !important;
+  border-bottom: 2px solid #202432 !important;
+  box-shadow: inset 0 -18px 34px rgba(0,0,0,0.4);
+}
+
+.rFieldArea::before {
+  content: '';
+  position: absolute;
+  inset: 24% 0 auto;
+  height: 52px;
+  background:
+    linear-gradient(90deg, rgba(20,22,28,0.82) 0 9%, transparent 9% 91%, rgba(20,22,28,0.82) 91%),
+    repeating-linear-gradient(90deg, rgba(35,29,24,0.84) 0 18px, rgba(20,18,16,0.9) 18px 21px);
+  border-top: 2px solid rgba(245,222,150,0.18);
+  border-bottom: 2px solid rgba(0,0,0,0.42);
+  opacity: 0.88;
+}
+
+.rFieldArea::after {
+  bottom: 62px !important;
+  height: 3px !important;
+  background: linear-gradient(90deg, transparent, rgba(255,235,170,0.22), transparent) !important;
+}
+
+.rFieldBg {
+  background:
+    radial-gradient(ellipse at 50% 105%, rgba(0,0,0,0.34), transparent 62%),
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.045) 0 1px, transparent 1px 22px),
+    repeating-linear-gradient(90deg, rgba(0,0,0,0.12) 0 1px, transparent 1px 34px) !important;
+}
+
+.rFieldBanner {
+  position: absolute;
+  top: 8px;
+  min-width: 82px;
+  max-width: 38%;
+  padding: 5px 9px;
+  background: linear-gradient(180deg, var(--banner-color, #666), rgba(0,0,0,0.62));
+  border: 1px solid rgba(255,255,255,0.24);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-shadow: 0 1px 2px #000;
+  z-index: 7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rFieldBanner.atk {
+  left: 8px;
+  border-radius: 3px 10px 10px 3px;
+}
+
+.rFieldBanner.def {
+  right: 8px;
+  text-align: right;
+  border-radius: 10px 3px 3px 10px;
+}
+
+.rTroopLine {
+  position: absolute !important;
+  inset: 0 auto 0 0;
+  width: 50%;
+  padding: 0 !important;
+  display: block !important;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.rTroopLine.def {
+  left: auto;
+  right: 0;
+  flex-direction: initial !important;
+}
+
+.rTroopUnit {
+  position: absolute;
+  width: 64px;
+  height: 78px;
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 9px 5px rgba(0,0,0,0.42));
+}
+
+.rTroopLine.atk .slot0 { left: 46%; bottom: 31px; z-index: 8; transform: scale(1.14); }
+.rTroopLine.atk .slot1 { left: 28%; bottom: 42px; z-index: 7; transform: scale(1.02); }
+.rTroopLine.atk .slot2 { left: 13%; bottom: 73px; z-index: 5; transform: scale(0.86); opacity: 0.9; }
+.rTroopLine.atk .slot3 { left: 7%;  bottom: 28px; z-index: 6; transform: scale(0.95); opacity: 0.96; }
+.rTroopLine.atk .slot4 { left: 33%; bottom: 94px; z-index: 4; transform: scale(0.78); opacity: 0.82; }
+.rTroopLine.atk .slot5 { left: 2%;  bottom: 91px; z-index: 3; transform: scale(0.74); opacity: 0.78; }
+
+.rTroopLine.def .slot0 { right: 46%; bottom: 31px; z-index: 8; transform: scale(1.14); }
+.rTroopLine.def .slot1 { right: 28%; bottom: 42px; z-index: 7; transform: scale(1.02); }
+.rTroopLine.def .slot2 { right: 13%; bottom: 73px; z-index: 5; transform: scale(0.86); opacity: 0.9; }
+.rTroopLine.def .slot3 { right: 7%;  bottom: 28px; z-index: 6; transform: scale(0.95); opacity: 0.96; }
+.rTroopLine.def .slot4 { right: 33%; bottom: 94px; z-index: 4; transform: scale(0.78); opacity: 0.82; }
+.rTroopLine.def .slot5 { right: 2%;  bottom: 91px; z-index: 3; transform: scale(0.74); opacity: 0.78; }
+
+.rTroopUnit.attacking .battleMiniSprite.atk {
+  animation: miniAdvanceAtk 0.43s ease-out;
+}
+
+.rTroopUnit.attacking .battleMiniSprite.def {
+  animation: miniAdvanceDef 0.43s ease-out;
+}
+
+@keyframes miniAdvanceAtk {
+  0%, 100% { transform: translateX(0) translateY(0); }
+  45% { transform: translateX(22px) translateY(-4px); }
+}
+
+@keyframes miniAdvanceDef {
+  0%, 100% { transform: translateX(0) translateY(0); }
+  45% { transform: translateX(-22px) translateY(-4px); }
+}
+
+.battleMiniSprite {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.battleMiniSprite svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.battleMiniSprite.is-hit {
+  animation: miniHit 0.26s ease-out;
+}
+
+.battleMiniSprite.is-defeated {
+  filter: grayscale(0.78) brightness(0.5);
+  transform: rotate(-8deg) translateY(8px);
+}
+
+.battleMiniSprite.card {
+  width: 66px;
+  height: 74px;
+  margin: -8px auto -5px;
+}
+
+@keyframes miniHit {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  60% { transform: translateX(5px); }
+}
+
+.rDmgDisplay {
+  top: auto !important;
+  bottom: 12px;
+  gap: 9px !important;
+  z-index: 12 !important;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.34);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.rDmgNum {
+  font-size: clamp(1.45rem, 7vw, 2.25rem) !important;
+  letter-spacing: 0.03em;
+}
+
+.rFloat {
+  font-size: 1.55rem !important;
+  z-index: 18 !important;
+}
+
+.rFloat.atk { left: 26% !important; }
+.rFloat.def { right: 26% !important; }
+
+.rSlashEffect {
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  top: 20%;
+  height: 56%;
+  z-index: 16;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 50%, rgba(255,255,255,0.8), transparent 20%),
+    conic-gradient(from 235deg at 50% 50%, transparent 0deg, rgba(255,255,255,0.86) 32deg, rgba(175,120,255,0.3) 54deg, transparent 80deg);
+  mix-blend-mode: screen;
+  clip-path: polygon(0 56%, 46% 32%, 100% 0, 58% 50%, 100% 100%, 45% 64%);
+  animation: slashCut 0.54s ease-out forwards;
+}
+
+@keyframes slashCut {
+  from { opacity: 0; transform: scaleX(0.55) rotate(-7deg); }
+  38% { opacity: 1; }
+  to { opacity: 0; transform: scaleX(1.05) rotate(2deg); }
+}
+
+.rBattleSides {
+  background:
+    linear-gradient(90deg, rgba(30,64,106,0.2), transparent 47%, rgba(127,34,48,0.2)),
+    #070a10 !important;
+}
+
+.rBattleSide {
+  padding: 6px !important;
+}
+
+.rCardGrid {
+  gap: 5px !important;
+}
+
+.rCard {
+  border-radius: 4px !important;
+  background: linear-gradient(180deg, #121927 0%, #090e16 100%) !important;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.035);
+}
+
+.rPortrait {
+  height: 64px !important;
+  background:
+    radial-gradient(ellipse at 50% 80%, rgba(255,255,255,0.09), transparent 48%),
+    linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.2));
+}
+
+.rPortrait::after {
+  background: linear-gradient(180deg, transparent 56%, rgba(0,0,0,0.62) 100%) !important;
+}
+
+.rCardName {
+  font-size: 0.62rem !important;
+  font-weight: 700;
+  color: #d9dde8 !important;
+}
+
+.rStatChip {
+  border-radius: 2px;
+  padding: 1px 3px;
+  background: rgba(255,255,255,0.055);
+}
+
+.rFooterBar {
+  background: linear-gradient(180deg, #101722 0%, #070b12 100%) !important;
+  border-top-color: rgba(240,192,64,0.24) !important;
+}
+
+@media (max-width: 380px) {
+  .rFieldArea {
+    min-height: 198px;
+  }
+
+  .rTroopUnit {
+    width: 56px;
+    height: 70px;
+  }
+
+  .battleMiniSprite.card {
+    width: 58px;
+    height: 66px;
+  }
+
+  .rPortrait {
+    height: 58px !important;
+  }
+}
+
+/* ============================================================
+   Visual overhaul — title, illustrated map, officer art
+   ============================================================ */
+
+.titleScreen {
+  justify-content: flex-end !important;
+  padding: 30px 22px 64px !important;
+  background: #06080d !important;
+}
+
+.titleScreen::before {
+  z-index: 1;
+  background:
+    linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.68) 58%, rgba(0,0,0,0.92)),
+    repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.018) 40px) !important;
+}
+
+.titleArtLayer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.titleMapArt {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  opacity: 0.42;
+  filter: saturate(0.82) contrast(1.08) brightness(0.7);
+  transform: scale(1.08);
+}
+
+.titleCharArt {
+  position: absolute;
+  left: 50%;
+  bottom: 176px;
+  width: min(860px, 158vw);
+  max-width: none;
+  transform: translateX(-50%);
+  opacity: 0.72;
+  filter: saturate(1.05) contrast(1.12) drop-shadow(0 18px 22px rgba(0,0,0,0.68));
+  mask-image: linear-gradient(90deg, transparent 0%, #000 9%, #000 91%, transparent 100%);
+}
+
+.titleContent {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  text-align: center;
+  margin-bottom: 28px;
+  text-shadow: 0 3px 12px rgba(0,0,0,0.92);
+}
+
+.titleEyebrow {
+  margin-bottom: 8px !important;
+  letter-spacing: 0.24em !important;
+  color: #f5d16f !important;
+}
+
+.titleLogo {
+  font-size: clamp(2.2rem, 11vw, 3.8rem) !important;
+  margin-bottom: 4px !important;
+}
+
+.titleSub {
+  margin-bottom: 0 !important;
+  color: rgba(232,234,240,0.88) !important;
+}
+
+.titleMenus,
+.titleDiffRow,
+.titleVersion {
+  position: relative;
+  z-index: 2;
+}
+
+.titleBtn {
+  min-height: 48px;
+  border-radius: 6px !important;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.34);
+}
+
+.mapContainer {
+  padding: 10px 10px 0 !important;
+}
+
+.illustratedMapShell {
+  max-width: 500px;
+  margin: 0 auto 10px;
+}
+
+.mapArtFrame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 0.76;
+  min-height: 430px;
+  border: 1px solid rgba(240,192,64,0.24);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #172018;
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,0.05),
+    0 12px 28px rgba(0,0,0,0.34);
+}
+
+.mapArtImage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  filter: saturate(1.02) contrast(1.02) brightness(0.86);
+  transform: scale(1.02);
+  user-select: none;
+  pointer-events: none;
+}
+
+.mapArtFrame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(0,0,0,0.1), transparent 34%, rgba(0,0,0,0.2)),
+    radial-gradient(ellipse at 50% 50%, transparent 42%, rgba(0,0,0,0.28) 100%);
+  pointer-events: none;
+}
+
+.mapLinkLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.mapRoute {
+  stroke: rgba(255,243,185,0.26);
+  stroke-width: 0.55;
+  stroke-linecap: round;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.55));
+}
+
+.mapRoute.hot {
+  stroke: rgba(240,192,64,0.86);
+  stroke-width: 0.9;
+}
+
+.mapRegionNode {
+  position: absolute;
+  z-index: 4;
+  width: 78px;
+  min-height: 46px;
+  transform: translate(-50%, -50%);
+  padding: 7px 7px 6px 18px;
+  border-radius: 7px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background:
+    linear-gradient(180deg, rgba(18,22,28,0.92), rgba(7,10,14,0.86)),
+    linear-gradient(90deg, color-mix(in srgb, var(--node-color) 46%, transparent), transparent);
+  color: #f3f0e7;
+  text-align: left;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.42);
+  transition: transform 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.mapRegionNode::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 9px;
+  bottom: 9px;
+  width: 4px;
+  border-radius: 99px;
+  background: var(--node-color);
+  box-shadow: 0 0 8px var(--node-color);
+}
+
+.mapRegionNode.selected {
+  z-index: 6;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px rgba(240,192,64,0.7), 0 0 20px rgba(240,192,64,0.4);
+  transform: translate(-50%, -50%) scale(1.06);
+}
+
+.mapRegionNode.neighbor {
+  border-color: rgba(255,100,80,0.58);
+}
+
+.mapRegionNode.threat-chance .nodeMeta { color: #9ff2a8; }
+.mapRegionNode.threat-even .nodeMeta { color: #f3d579; }
+.mapRegionNode.threat-danger .nodeMeta { color: #ff9a86; }
+.mapRegionNode.player .nodeMeta { color: #f3d579; }
+
+.nodeFlag {
+  position: absolute;
+  top: -7px;
+  left: 10px;
+  width: 14px;
+  height: 18px;
+  background: var(--node-color);
+  clip-path: polygon(0 0, 100% 0, 100% 72%, 50% 56%, 0 72%);
+  border: 1px solid rgba(255,255,255,0.24);
+}
+
+.nodeName {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nodeMeta {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.52rem;
+  line-height: 1.2;
+  color: rgba(220,226,236,0.75);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nodeHp {
+  display: block;
+  margin-top: 5px;
+  height: 3px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.nodeHp span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--node-color), #f6d978);
+  border-radius: inherit;
+}
+
+.mapLegendPanel {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  margin-top: 8px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  background: rgba(10,14,22,0.86);
+}
+
+.mapLegendPanel strong {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--gold);
+  margin-bottom: 2px;
+}
+
+.mapLegendPanel span {
+  font-size: 0.58rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.mapLegendKeys {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-content: center;
+  gap: 4px 8px;
+  min-width: 108px;
+}
+
+.mapLegendKeys span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.legendDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.legendDot.player { background: var(--gold); }
+.legendDot.chance { background: #6fe58a; }
+.legendDot.danger { background: #ff7b66; }
+
+.attackAdvisor {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.025);
+}
+
+.attackAdvisor span {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.56rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.attackAdvisor strong {
+  font-size: 0.64rem;
+  color: var(--text2);
+  text-align: right;
+  line-height: 1.35;
+}
+
+.attackAdvisor.ready span {
+  color: #150a06;
+  background: #f0c040;
+}
+
+.attackAdvisor.home span {
+  color: #cbd8ea;
+  background: rgba(90,120,160,0.24);
+}
+
+.attackAdvisor.blocked span {
+  color: #ffb0a0;
+  background: rgba(224,48,48,0.18);
+}
+
+.cmdGridFull {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 6px !important;
+}
+
+.cmdGridFull .cmdBtnEnd {
+  grid-column: span 2;
+}
+
+.cmdGridFull select {
+  min-height: 28px;
+}
+
+.officerArtBanner {
+  position: relative;
+  height: 116px;
+  margin: 0 0 10px;
+  border-radius: 7px;
+  overflow: hidden;
+  border: 1px solid rgba(240,192,64,0.18);
+  background: #10151d;
+}
+
+.officerArtBanner img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 42%;
+  filter: saturate(1.06) contrast(1.08);
+}
+
+.officerArtBannerShade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(0,0,0,0.78), transparent 48%, rgba(0,0,0,0.16));
+}
+
+.officerArtBannerText {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.9);
+}
+
+.officerArtBannerText span {
+  font-size: 0.64rem;
+  color: var(--muted);
+  letter-spacing: 0.16em;
+}
+
+.officerArtBannerText strong {
+  font-size: 1rem;
+  color: var(--gold);
+}
+
+.officerPortraitWrap {
+  width: 74px;
+  min-height: 96px;
+}
+
+.officerArtCrop {
+  width: 72px;
+  height: 94px;
+  border-radius: 5px;
+  border: 1px solid color-mix(in srgb, var(--officer-color, #f0c040) 54%, rgba(255,255,255,0.18));
+  background-image:
+    linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.64)),
+    url('/assets/art/character-design-sheet.png');
+  background-size: auto 118%;
+  background-position: var(--officer-art-position, 50% 45%);
+  background-repeat: no-repeat;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06), 0 5px 12px rgba(0,0,0,0.34);
+}
+
+.officerPortraitMedallion {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.18);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+}
+
+@media (max-width: 380px) {
+  .mapArtFrame {
+    min-height: 398px;
+  }
+
+  .mapRegionNode {
+    width: 70px;
+    min-height: 42px;
+    padding-left: 16px;
+  }
+
+  .nodeName {
+    font-size: 0.65rem;
+  }
+
+  .nodeMeta {
+    font-size: 0.49rem;
+  }
+
+  .titleCharArt {
+    bottom: 184px;
+    width: 176vw;
+  }
 }

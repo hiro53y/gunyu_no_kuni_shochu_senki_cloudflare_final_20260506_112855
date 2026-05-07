@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { skillCatalog, terrainLabel } from '../data/names';
 import {
   estimateRegionDefense, getAvailableRonin, getFactionOfficers,
@@ -6,7 +7,7 @@ import {
   getRegionOfficers,
 } from '../engine/selectors';
 import { PLAYER_FACTION_ID } from '../data/names';
-import type { ActionLog, DomesticFocus, GameState } from '../types/game';
+import type { ActionLog, DomesticFocus, GameState, Region } from '../types/game';
 import { OfficerCard } from '../components/OfficerCard';
 import { CharacterPortrait } from '../components/CharacterPortrait';
 
@@ -41,12 +42,42 @@ const domesticFoci: { key: DomesticFocus; label: string; icon: string }[] = [
   { key: 'developmentLevel', label: '開発', icon: '⚙' },
 ];
 
-const MAP_ROWS = [
-  ['r_shiramine',  'r_tsukishiro', 'r_kiridani'],
-  ['r_akihara',    'r_kagebana',   'r_suhama'],
-  ['r_kurose',     'r_midorinami', 'r_kazami'],
-  ['r_hagino',     'r_tokinoura',  'r_nagareyama'],
-];
+const REGION_POSITIONS: Record<string, { x: number; y: number }> = {
+  r_shiramine:  { x: 38, y: 17 },
+  r_tsukishiro: { x: 58, y: 24 },
+  r_kiridani:   { x: 23, y: 34 },
+  r_akihara:    { x: 46, y: 42 },
+  r_kurose:     { x: 70, y: 39 },
+  r_kazami:     { x: 21, y: 54 },
+  r_suzukano:   { x: 44, y: 59 },
+  r_takamori:   { x: 72, y: 59 },
+  r_amagiri:    { x: 21, y: 76 },
+  r_sabikawa:   { x: 48, y: 77 },
+  r_hoshimi:    { x: 67, y: 80 },
+  r_suhama:     { x: 50, y: 91 },
+};
+
+function getThreatBand(state: GameState, region: Region, selectedRegion?: Region): 'safe' | 'border' | 'chance' | 'even' | 'danger' {
+  if (region.ownerFactionId === PLAYER_FACTION_ID) {
+    const hasEnemyBorder = region.neighbors.some((nid) => state.regions[nid]?.ownerFactionId !== PLAYER_FACTION_ID);
+    return hasEnemyBorder ? 'border' : 'safe';
+  }
+  if (!selectedRegion?.neighbors.includes(region.id) && selectedRegion?.ownerFactionId === PLAYER_FACTION_ID) {
+    return 'danger';
+  }
+  const defense = estimateRegionDefense(state, region.id);
+  if (defense < 1000) return 'chance';
+  if (defense < 1500) return 'even';
+  return 'danger';
+}
+
+const threatLabel: Record<ReturnType<typeof getThreatBand>, string> = {
+  safe: '後方',
+  border: '国境',
+  chance: '好機',
+  even: '互角',
+  danger: '警戒',
+};
 
 export function MapScreen({
   state, onSelectRegion, onDomestic, onRecruit, onTrain, onSearch,
@@ -65,8 +96,11 @@ export function MapScreen({
 
   const selectedRegion  = state.regions[state.selectedRegionId];
   const isPlayerRegion  = selectedRegion?.ownerFactionId === PLAYER_FACTION_ID;
-  const neighborRegions = selectedRegion?.neighbors?.map((nid) => state.regions[nid]) ?? [];
-  const canAttack = isPlayerRegion && neighborRegions.some((n) => n && n.ownerFactionId !== PLAYER_FACTION_ID);
+  const canAttack = Boolean(
+    selectedRegion &&
+    selectedRegion.ownerFactionId !== PLAYER_FACTION_ID &&
+    selectedRegion.neighbors.some((nid) => state.regions[nid]?.ownerFactionId === PLAYER_FACTION_ID),
+  );
 
   const officersInRegion = useMemo(
     () => selectedRegion ? getRegionOfficers(state, selectedRegion.id) : [],
@@ -84,38 +118,94 @@ export function MapScreen({
       return getFactionRegions(state, b.id).length - getFactionRegions(state, a.id).length;
     }), [state]);
 
-  const renderMap = () => (
-    <div className="mapGrid">
-      {MAP_ROWS.flat().map((rid) => {
-        const r = state.regions[rid];
-        if (!r) return <div key={rid} />;
-        const f = state.factions[r.ownerFactionId];
-        const isPlayer   = r.ownerFactionId === PLAYER_FACTION_ID;
-        const isSelected = rid === state.selectedRegionId;
-        const isNeighbor = selectedRegion?.neighbors.includes(rid);
-        const hpRatio = r.castleHp / r.maxCastleHp;
-        const hpCls   = hpRatio > 0.55 ? '' : hpRatio > 0.3 ? ' mid' : ' low';
-        return (
-          <button
-            key={rid}
-            className={['mapTile', isPlayer ? 'player' : '', isSelected ? 'selected' : '', isNeighbor && !isSelected ? 'tileNeighbor' : ''].filter(Boolean).join(' ')}
-            style={{ '--tile-color': f?.color ?? '#666' } as React.CSSProperties}
-            onClick={() => onSelectRegion(rid)}
-            type="button"
-          >
-            <div className="tileColorBar" />
-            {isPlayer && <span className="tilePlayer">我</span>}
-            <span className="tileName">{r.name}</span>
-            <span className="tileFaction" style={{ color: f?.color }}>{f?.name}</span>
-            <span className="tileTroops">兵 {r.localTroops.toLocaleString()}</span>
-            <div className="tileHpBar">
-              <div className={`tileHpFill${hpCls}`} style={{ width: `${hpRatio * 100}%` }} />
-            </div>
-          </button>
-        );
-      })}
-    </div>
-  );
+  const renderMap = () => {
+    const regionList = Object.values(state.regions).sort((a, b) => a.mapY - b.mapY || a.mapX - b.mapX);
+    const links = regionList.flatMap((region) =>
+      region.neighbors
+        .filter((nid) => region.id < nid && REGION_POSITIONS[nid])
+        .map((nid) => ({ from: region.id, to: nid })),
+    );
+
+    return (
+      <section className="illustratedMapShell" aria-label="八州国絵図">
+        <div className="mapArtFrame">
+          <img
+            className="mapArtImage"
+            src="/assets/art/map-design-sheet.png"
+            alt=""
+            draggable={false}
+          />
+          <svg className="mapLinkLayer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            {links.map(({ from, to }) => {
+              const a = REGION_POSITIONS[from];
+              const b = REGION_POSITIONS[to];
+              const hot = from === state.selectedRegionId || to === state.selectedRegionId;
+              return (
+                <line
+                  key={`${from}-${to}`}
+                  className={`mapRoute${hot ? ' hot' : ''}`}
+                  x1={a.x}
+                  y1={a.y}
+                  x2={b.x}
+                  y2={b.y}
+                />
+              );
+            })}
+          </svg>
+
+          {regionList.map((r) => {
+            const f = state.factions[r.ownerFactionId];
+            const pos = REGION_POSITIONS[r.id] ?? { x: 50, y: 50 };
+            const isPlayer   = r.ownerFactionId === PLAYER_FACTION_ID;
+            const isSelected = r.id === state.selectedRegionId;
+            const isNeighbor = selectedRegion?.neighbors.includes(r.id) ?? false;
+            const band = getThreatBand(state, r, selectedRegion);
+            const hpRatio = Math.max(0, Math.min(1, r.castleHp / r.maxCastleHp));
+            return (
+              <button
+                key={r.id}
+                className={[
+                  'mapRegionNode',
+                  isPlayer ? 'player' : 'enemy',
+                  isSelected ? 'selected' : '',
+                  isNeighbor && !isSelected ? 'neighbor' : '',
+                  `threat-${band}`,
+                ].filter(Boolean).join(' ')}
+                style={{
+                  left: `${pos.x}%`,
+                  top: `${pos.y}%`,
+                  '--node-color': f?.color ?? '#888',
+                } as CSSProperties}
+                onClick={() => onSelectRegion(r.id)}
+                type="button"
+              >
+                <span className="nodeFlag" />
+                <span className="nodeName">{r.name}</span>
+                <span className="nodeMeta">
+                  {isPlayer ? '我領' : f?.name ?? '不明'} / {threatLabel[band]}
+                </span>
+                <span className="nodeHp">
+                  <span style={{ width: `${hpRatio * 100}%` }} />
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mapLegendPanel">
+          <div>
+            <strong>八州国絵図</strong>
+            <span>隣接線が進軍路。赤く光る地域は選択地から即応可能。</span>
+          </div>
+          <div className="mapLegendKeys">
+            <span><i className="legendDot player" />我領</span>
+            <span><i className="legendDot chance" />好機</span>
+            <span><i className="legendDot danger" />警戒</span>
+          </div>
+        </div>
+      </section>
+    );
+  };
 
   const renderRegionDetail = () => {
     if (!selectedRegion) return null;
@@ -139,13 +229,24 @@ export function MapScreen({
             { label: '守備兵', val: selectedRegion.localTroops.toLocaleString(), cls: '' },
             { label: '防衛力', val: defense.toLocaleString(),               cls: '' },
             { label: '開発度', val: String(selectedRegion.developmentLevel), cls: '' },
-            { label: '城耀久', val: `${selectedRegion.castleHp}/${selectedRegion.maxCastleHp}`, cls: hpRatio < 0.3 ? 'danger' : '' },
+            { label: '城耐久', val: `${selectedRegion.castleHp}/${selectedRegion.maxCastleHp}`, cls: hpRatio < 0.3 ? 'danger' : '' },
           ].map(({ label, val, cls }) => (
             <div key={label} className="rStat">
               <div className="rStatLabel">{label}</div>
               <div className={`rStatVal${cls ? ' ' + cls : ''}`}>{val}</div>
             </div>
           ))}
+        </div>
+
+        <div className={`attackAdvisor${canAttack ? ' ready' : isPlayerRegion ? ' home' : ' blocked'}`}>
+          <span>{canAttack ? '進軍可能' : isPlayerRegion ? '自領選択中' : '進軍不可'}</span>
+          <strong>
+            {canAttack
+              ? `出陣武将 ${state.selectedOfficerIds.length}/3`
+              : isPlayerRegion
+                ? '隣接する敵領を選ぶと進軍できる'
+                : '自領に隣接していない敵領'}
+          </strong>
         </div>
 
         {officersInRegion.length > 0 && (
@@ -225,6 +326,14 @@ export function MapScreen({
         <span style={{ fontSize: '0.65rem', color: 'var(--muted)' }}>
           {state.selectedOfficerIds.length}/3 選択中
         </span>
+      </div>
+      <div className="officerArtBanner" aria-hidden="true">
+        <img src="/assets/art/character-design-sheet.png" alt="" draggable={false} />
+        <div className="officerArtBannerShade" />
+        <div className="officerArtBannerText">
+          <span>武将名鑑</span>
+          <strong>{playerOfficers.length}名</strong>
+        </div>
       </div>
       <div className="officerGrid">
         {playerOfficers.map((o) => (
@@ -352,7 +461,7 @@ export function MapScreen({
         })}
       </nav>
 
-      <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
+      <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 'calc(132px + env(safe-area-inset-bottom))' }}>
         {tab === 'map'      && <div className="mapContainer">{renderMap()}{renderRegionDetail()}</div>}
         {tab === 'officers' && renderOfficers()}
         {tab === 'status'   && renderStatus()}
@@ -361,7 +470,7 @@ export function MapScreen({
       </div>
 
       <div className="commandBar">
-        <div className="cmdGrid">
+        <div className="cmdGrid cmdGridFull">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <select
               style={{ fontSize: '0.6rem', background: 'var(--panel)', color: 'var(--text2)', border: '1px solid var(--border)', borderRadius: 3, padding: '2px 4px', fontFamily: 'var(--font-serif)', width: '100%' }}
@@ -375,10 +484,16 @@ export function MapScreen({
             </button>
           </div>
           <button className="cmdBtn" onClick={onRecruit} disabled={ap < 1 || !isPlayerRegion} type="button">
-            <span className="apCost">AP1</span><span className="icon">&#128326;</span><span>彴兵</span>
+            <span className="apCost">AP1</span><span className="icon">&#9873;</span><span>徴兵</span>
           </button>
           <button className="cmdBtn" onClick={onTrain} disabled={ap < 1 || !isPlayerRegion} type="button">
-            <span className="apCost">AP1</span><span className="icon">&#9876;</span><span>鍛練</span>
+            <span className="apCost">AP1</span><span className="icon">&#9876;</span><span>訓練</span>
+          </button>
+          <button className="cmdBtn" onClick={onSearch} disabled={ap < 1 || !isPlayerRegion} type="button">
+            <span className="apCost">AP1</span><span className="icon">&#128269;</span><span>探索</span>
+          </button>
+          <button className="cmdBtn" onClick={onRest} disabled={ap < 1} type="button">
+            <span className="apCost">AP1</span><span className="icon">&#9728;</span><span>休養</span>
           </button>
           <button className="cmdBtn cmdBtnAttack"
             onClick={onInvade}

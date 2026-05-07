@@ -1,8 +1,9 @@
 import { skillCatalog } from '../data/names';
 import { officerTitles } from '../data/dialogue';
 import type { Faction, Officer } from '../types/game';
-import { getOfficerRole, getStatColor, roleBadgeStyle } from './portraitUtils';
+import { getOfficerArtPosition, getOfficerRole, getStatColor, roleBadgeStyle } from './portraitUtils';
 import { CharacterPortrait } from './CharacterPortrait';
+import type { CSSProperties } from 'react';
 
 interface OfficerCardProps {
   officer: Officer;
@@ -26,6 +27,10 @@ export function OfficerCard({ officer, faction, selected, disabled = false, onTo
   const troopRatio   = officer.troops / officer.maxTroops;
   const staminaRatio = officer.stamina / officer.maxStamina;
   const isWounded    = officer.stamina < 30;
+  const artStyle = {
+    '--officer-art-position': getOfficerArtPosition(officer),
+    '--officer-color': faction.color,
+  } as CSSProperties;
 
   return (
     <button
@@ -37,7 +42,10 @@ export function OfficerCard({ officer, faction, selected, disabled = false, onTo
     >
       <div className="officerCardHeader">
         <div className="officerPortraitWrap">
-          <CharacterPortrait officer={officer} factionColor={faction.color} size={62} />
+          <div className="officerArtCrop" style={artStyle} />
+          <div className="officerPortraitMedallion">
+            <CharacterPortrait officer={officer} factionColor={faction.color} size={38} />
+          </div>
           <span className="roleTagNew" style={roleBadgeStyle[role]}>{role}</span>
           {selected && <span className="selectedBadgeNew">{'出陣'}</span>}
         </div>

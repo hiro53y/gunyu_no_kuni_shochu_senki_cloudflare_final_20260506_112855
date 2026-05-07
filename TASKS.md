@@ -28,3 +28,9 @@
 - [x] Cloudflare Pages向け `_headers` と `.node-version` を追加する
 - [x] Cloudflare向け検証用パッケージでinstall/test/buildを確認する
 - [x] Cloudflare向けクリーン最終deliverablesパッケージを作成する
+- [x] 地図タブを国絵図背景＋地域ノードUIへ改修する
+- [x] 武将デザインシートをタイトル画面と武将カードへ組み込む
+- [x] 戦闘画面を自作SVGミニキャラ付きの横長戦場UIへ改修する
+- [x] 下部コマンドに探索・休養を復帰し、進軍条件を敵領選択に修正する
+- [x] 具体作品名がコード・コメントに残らないよう整理する
+- [x] 最新改修後に `npm run test` と `npm run build` を確認する

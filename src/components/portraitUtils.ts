@@ -40,6 +40,18 @@ export function getOfficerRole(officer: Officer): '武' | '文' | '智' {
   return '智';
 }
 
+/** デザインシートから武将カード用の切り抜き位置を決定する */
+export function getOfficerArtPosition(officer: Officer): string {
+  const palette = ['4% 45%', '21% 45%', '38% 45%', '55% 45%', '72% 45%', '89% 45%'];
+  let hash = 0;
+  for (let i = 0; i < officer.id.length; i += 1) {
+    hash = (hash * 31 + officer.id.charCodeAt(i)) % 997;
+  }
+  const role = getOfficerRole(officer);
+  const roleOffset = role === '武' ? 0 : role === '智' ? 2 : 4;
+  return palette[(hash + roleOffset) % palette.length];
+}
+
 /** 役割ごとの色 */
 export const roleBadgeStyle: Record<string, React.CSSProperties> = {
   武: { color: '#ff9a9a', background: 'rgba(180,28,28,0.35)' },

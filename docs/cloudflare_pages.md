@@ -11,8 +11,9 @@
 
 含める:
 - `src/`
-- `public/`
+- `public/`（`public/assets/art/` のPNGを含む）
 - `tests/`
+- `docs/`
 - `package.json`
 - `package-lock.json`
 - `index.html`

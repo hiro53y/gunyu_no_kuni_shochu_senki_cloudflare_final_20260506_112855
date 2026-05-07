@@ -14,14 +14,17 @@
 ## build
 - [x] ルートで `npm run build`
 - [x] 検証用deliverables内で `npm run build`
+- [x] 現行Cloudflare最終フォルダで `npm run build`
 
 ## 起動確認
 - [x] build済み `dist` のトップページを簡易HTTPサーバーで配信し、HTTP 200を確認
+- [x] build済み `dist` のmanifest、Service Worker、地図画像、武将画像がHTTP 200で配信されることを確認
 - [ ] 実機スマホまたはブラウザでのタップ操作確認
 
 ## パッケージ
 - [x] `deliverables/gunyu_no_kuni_shochu_senki_final_20260506_110019/` を作成
 - [x] 最終パッケージに `node_modules`、`dist`、`out/test-build`、`tsconfig.tsbuildinfo` が含まれないことを確認
+- [x] 現行使用対象を `deliverables/gunyu_no_kuni_shochu_senki_cloudflare_final_20260506_112855/` に固定
 
 ## 既知の環境差分
 - [ ] OneDrive配下ではVite dev serverの依存最適化キャッシュ操作で `EPERM` が出る場合がある

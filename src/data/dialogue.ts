@@ -1,5 +1,5 @@
 // 武将台詞システム
-// 戦国ランス風の個性的な台詞を各武将に設定する
+// 和風国取りSLG向けの個性的な台詞を各武将に設定する
 
 /** 攻撃開始時の台詞 */
 export const attackQuotes: Record<string, string[]> = {

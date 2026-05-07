@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { skillCatalog } from '../data/names';
 import type { BattleResult, GameState } from '../types/game';
+import { BattleMiniSprite } from '../components/BattleMiniSprite';
 
 interface Props { result: BattleResult; state: GameState; onClose: () => void; }
 
@@ -241,12 +243,24 @@ function ArmyGauge({ totalHp, maxHp, side }: { totalHp: number; maxHp: number; s
   );
 }
 
-function TroopLine({ count, side, active }: { count: number; side: 'atk'|'def'; active: boolean }) {
+function TroopLine({ count, side, active, color }: { count: number; side: 'atk'|'def'; active: boolean; color: string }) {
+  const unitCount = Math.max(1, Math.min(Math.max(count, 0), 6));
   return (
     <div className={`rTroopLine ${side}`}>
-      {Array(Math.min(Math.max(count, 0), 8)).fill(0).map((_, i) => (
-        <div key={i} className={`rTroopShape ${side} ${active ? 'attacking' : ''}`}
-          style={{ animationDelay: `${i * 0.04}s` }} />
+      {Array(unitCount).fill(0).map((_, i) => (
+        <div
+          key={i}
+          className={`rTroopUnit slot${i}${active ? ' attacking' : ''}`}
+          style={{ animationDelay: `${i * 0.04}s` }}
+        >
+          <BattleMiniSprite
+            variant={i + (side === 'def' ? 2 : 0)}
+            side={side}
+            color={color}
+            active={active}
+            size="field"
+          />
+        </div>
       ))}
     </div>
   );
@@ -269,7 +283,15 @@ function CharCard({ c, side, isActive, isHit, isSkill, isDefeated }: CardProps) 
   return (
     <div className={cls}>
       <div className="rPortrait">
-        <PortraitSvg type={c.portraitType} color={c.color} />
+        <BattleMiniSprite
+          variant={c.portraitType}
+          side={side}
+          color={c.color}
+          active={isActive}
+          hit={isHit}
+          defeated={isDefeated}
+          size="card"
+        />
         {isSkill && <div className="rSkillRing" />}
         {isDefeated && <div className="rPortraitX">✕</div>}
       </div>
@@ -416,9 +438,11 @@ export function BattleScene({ result, state, onClose }: Props) {
 
   const atkName = atkFaction?.name ?? '攻撃側';
   const defName = defFaction?.name ?? '防衛側';
+  const atkColor = atkFaction?.color ?? '#d84c36';
+  const defColor = defFaction?.color ?? '#4090e0';
 
   return (
-    <div className="ranceBattle">
+    <div className="battleStage">
       <div className="rTopHud">
         <div className="rHudSide atk">
           <div className="rHudLabel">{atkName}</div>
@@ -436,20 +460,31 @@ export function BattleScene({ result, state, onClose }: Props) {
 
       <div className="rFieldArea">
         <div className="rFieldBg" />
-        <TroopLine count={atkAlive} side="atk" active={activeAtk >= 0} />
+        <div className="rFieldBanner atk" style={{ '--banner-color': atkColor } as CSSProperties}>
+          {atkName}
+        </div>
+        <div className="rFieldBanner def" style={{ '--banner-color': defColor } as CSSProperties}>
+          {defName}
+        </div>
+        <TroopLine count={atkAlive} side="atk" active={activeAtk >= 0} color={atkColor} />
         <div className="rDmgDisplay">
           <span className="rDmgNum atk">{atkTotalHp.toLocaleString()}</span>
           <span className="rDmgBar"> | </span>
           <span className="rDmgNum def">{defTotalHp.toLocaleString()}</span>
         </div>
-        <TroopLine count={defAlive} side="def" active={activeDef >= 0} />
+        <TroopLine count={defAlive} side="def" active={activeDef >= 0} color={defColor} />
         {floats.map(f => (
           <div key={f.id} className={`rFloat ${f.side}${f.isSkill ? ' skill' : ''}`}
             style={{ top: `${20 + (f.idx % 3) * 25}%` }}>
             −{f.dmg.toLocaleString()}
           </div>
         ))}
-        {skillFlash && <div className="rSkillFlash" />}
+        {skillFlash && (
+          <>
+            <div className="rSkillFlash" />
+            <div className="rSlashEffect" />
+          </>
+        )}
       </div>
 
       <div className="rBattleSides">

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gunyu-no-kuni-v2';
+const CACHE_NAME = 'gunyu-no-kuni-v3';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg'];
 
 self.addEventListener('install', (event) => {

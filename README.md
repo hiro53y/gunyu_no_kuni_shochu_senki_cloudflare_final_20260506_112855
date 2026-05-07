@@ -12,6 +12,7 @@
 - 勝利/敗北条件と結果画面
 - localStorageによる手動セーブ、自動セーブ、ロード、削除
 - スマホ縦画面を優先したカードUI
+- イラスト調の国絵図、武将デザインシート、SVGミニキャラによる戦闘画面
 - Cloudflare Pages公開用設定
 - Netlify互換設定
 - PWA manifestと簡易Service Worker
@@ -74,14 +75,21 @@ npm run deploy:cloudflare
 3. GitHubへpushする。
 4. Cloudflare PagesでGitHubリポジトリを接続し、自動デプロイを有効化する。
 
-GitHubにアップする対象は `src/`、`public/`、`tests/`、設定ファイル、READMEです。`node_modules/`、`dist/`、`out/`、`deliverables/`、`.git/` はアップしません。詳しくは `docs/cloudflare_pages.md` を参照してください。
+GitHubにアップする対象は `src/`、`public/`、`tests/`、`docs/`、設定ファイル、READMEです。`public/assets/art/` のPNGはアプリ表示に必要な同梱アセットなので含めます。`node_modules/`、`dist/`、`out/`、`deliverables/`、`.git/` はアップしません。詳しくは `docs/cloudflare_pages.md` を参照してください。
 
 ## 操作方法
 - 上部ヘッダーでターン、金、兵糧、AP、支配地域数を確認します。
-- 地図タブで地域を選択します。
+- 地図タブで国絵図上の地域を選択します。
 - 武将タブで行動に参加する武将を最大3人まで選択します。
 - 下部アクションバーから内政、徴兵、訓練、探索、進軍、休養、ターン終了を実行します。
-- 探索で浪人を発見した場合、内政タブから登用できます。
+- 進軍は隣接する敵領を選択してから実行します。
+- 探索で浪人を発見した場合、地域詳細から登用できます。
+
+## アセット仕様
+- `public/assets/art/map-design-sheet.png` は地図タブとタイトル画面で使用します。
+- `public/assets/art/character-design-sheet.png` はタイトル画面と武将カードで使用します。
+- 戦闘画面のミニキャラは `src/components/BattleMiniSprite.tsx` の自作SVGで生成します。
+- 外部有料素材やランタイム画像生成APIには依存しません。
 
 ## セーブ仕様
 - 手動セーブとターン進行時の自動セーブに対応します。
