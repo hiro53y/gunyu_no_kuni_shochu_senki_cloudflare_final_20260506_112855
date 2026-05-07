@@ -7,7 +7,7 @@ import {
   getRegionOfficers,
 } from '../engine/selectors';
 import { PLAYER_FACTION_ID } from '../data/names';
-import type { ActionLog, DomesticFocus, GameState, Region } from '../types/game';
+import type { ActionLog, DomesticFocus, GameState, Officer, Region } from '../types/game';
 import { OfficerCard } from '../components/OfficerCard';
 import { CharacterPortrait } from '../components/CharacterPortrait';
 
@@ -110,7 +110,30 @@ export function MapScreen({
     () => getAvailableRonin(state).filter((o) => o.locationRegionId === state.selectedRegionId),
     [state],
   );
-  const playerOfficers = useMemo(() => getFactionOfficers(state, PLAYER_FACTION_ID), [state]);
+  const playerOfficers = useMemo(
+    () => Object.values(state.officers)
+      .filter((o) => o.factionId === PLAYER_FACTION_ID && (o.status === 'active' || o.status === 'wounded'))
+      .sort((a, b) => {
+        if (a.status === 'wounded' && b.status !== 'wounded') return -1;
+        if (a.status !== 'wounded' && b.status === 'wounded') return 1;
+        return a.locationRegionId === b.locationRegionId
+          ? a.name.localeCompare(b.name, 'ja')
+          : String(a.locationRegionId).localeCompare(String(b.locationRegionId), 'ja');
+      }),
+    [state.officers],
+  );
+  const selectedBattleOfficers = useMemo(
+    () => state.selectedOfficerIds
+      .map((id) => state.officers[id])
+      .filter((o): o is Officer =>
+        Boolean(o) &&
+        o.factionId === PLAYER_FACTION_ID &&
+        o.status === 'active' &&
+        o.troops > 0 &&
+        o.stamina >= 18,
+      ),
+    [state.officers, state.selectedOfficerIds],
+  );
   const allFactions    = useMemo(() =>
     Object.values(state.factions).filter((f) => f.isMajor).sort((a, b) => {
       if (a.isPlayer) return -1;
@@ -242,7 +265,7 @@ export function MapScreen({
           <span>{canAttack ? '進軍可能' : isPlayerRegion ? '自領選択中' : '進軍不可'}</span>
           <strong>
             {canAttack
-              ? `出陣武将 ${state.selectedOfficerIds.length}/3`
+              ? `出陣可能 ${selectedBattleOfficers.length}/3`
               : isPlayerRegion
                 ? '隣接する敵領を選ぶと進軍できる'
                 : '自領に隣接していない敵領'}
@@ -324,7 +347,7 @@ export function MapScreen({
       <div className="sectionHead">
         <h2>武　将</h2>
         <span style={{ fontSize: '0.65rem', color: 'var(--muted)' }}>
-          {state.selectedOfficerIds.length}/3 選択中
+          {selectedBattleOfficers.length}/3 出陣可
         </span>
       </div>
       <div className="officerArtBanner" aria-hidden="true">
@@ -342,6 +365,7 @@ export function MapScreen({
             officer={o}
             faction={faction}
             selected={state.selectedOfficerIds.includes(o.id)}
+            disabled={o.status !== 'active'}
             onToggle={onToggleOfficer}
           />
         ))}
@@ -497,7 +521,7 @@ export function MapScreen({
           </button>
           <button className="cmdBtn cmdBtnAttack"
             onClick={onInvade}
-            disabled={ap < 1 || !canAttack || state.selectedOfficerIds.length === 0}
+            disabled={ap < 1 || !canAttack || selectedBattleOfficers.length === 0}
             type="button"
           >
             <span className="apCost">AP1</span><span className="icon">&#128481;</span><span>進軍</span>

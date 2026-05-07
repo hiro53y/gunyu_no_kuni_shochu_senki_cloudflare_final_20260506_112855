@@ -56,7 +56,9 @@ function buildEvents(atk: Combatant[], def: Combatant[], result: BattleResult): 
   const atkHp = atk.map(c => ({ hp: c.maxHp, final: c.finalHp }));
   const defHp = def.map(c => ({ hp: c.maxHp, final: c.finalHp }));
   const ROUNDS = 4;
-  const skillNames = result.activatedSkills.map(id => skillCatalog[id]?.name ?? null).filter(Boolean) as string[];
+  const skillNames = result.activatedSkills
+    .map((idOrLabel) => skillCatalog[idOrLabel]?.name ?? idOrLabel)
+    .filter((label) => label.trim().length > 0);
   for (let round = 0; round < ROUNDS; round++) {
     const isLast = round === ROUNDS - 1;
     for (let ai = 0; ai < atk.length; ai++) {

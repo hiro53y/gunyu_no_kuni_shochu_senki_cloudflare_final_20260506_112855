@@ -1111,6 +1111,9 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   background: rgba(240,192,64,0.04);
 }
 .officerCard.isWounded { border-color: rgba(224,80,80,0.5); }
+.officerCard:disabled {
+  opacity: 0.72;
+}
 
 /* ── ヘッダー：ポートレート + 情報 ── */
 .officerCardHeader {
@@ -1162,6 +1165,11 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   border-radius: 3px;
   z-index: 5;
   letter-spacing: 0.04em;
+}
+
+.selectedBadgeNew.wounded {
+  background: #a83232;
+  color: #fff;
 }
 
 /* ── 名前・肩書・勢力 ── */

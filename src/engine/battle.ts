@@ -71,6 +71,20 @@ function officerPower(officer: Officer, mode: 'attack' | 'defense'): number {
   return officer.troops * commandFactor * valorFactor * wisdomFactor * staminaFactor(officer);
 }
 
+function addOfficerExperience(officer: Officer, expGain: number): Officer {
+  const totalExp = Math.max(0, officer.exp + expGain);
+  const levelGain = Math.floor(totalExp / 100);
+  if (levelGain <= 0) {
+    return { ...officer, exp: totalExp };
+  }
+  return {
+    ...officer,
+    level: officer.level + levelGain,
+    exp: totalExp % 100,
+    maxTroops: officer.maxTroops + levelGain * 25,
+  };
+}
+
 function selectDefenders(state: GameState, targetRegionId: string): Officer[] {
   const region = state.regions[targetRegionId];
   const regionDefenders = getRegionOfficers(state, targetRegionId);
@@ -103,13 +117,12 @@ function distributeLosses(
     const share = totalBefore > 0 ? officer.troops / totalBefore : 0;
     const loss = Math.min(officer.troops, Math.round(totalLosses * share));
     const after = Math.max(0, officer.troops - loss);
-    officers[id] = {
+    officers[id] = addOfficerExperience({
       ...officer,
       troops: after,
       stamina: Math.max(5, officer.stamina - (loss > 0 ? 18 : 10)),
-      exp: officer.exp + Math.round(12 + loss / 12),
       status: after <= 0 ? 'wounded' : officer.status,
-    };
+    }, Math.round(12 + loss / 12));
     participants.push({ officerId: id, name: officer.name, troopsBefore: officer.troops, troopsAfter: after });
     actualLosses += officer.troops - after;
   });
@@ -233,8 +246,9 @@ export function resolveBattle(state: GameState, input: BattleInput): GameState {
           };
     });
     attackerOfficers.forEach((officer) => {
-      if (officers[officer.id]?.status === 'active') {
-        officers[officer.id] = { ...officers[officer.id], locationRegionId: targetRegion.id, exp: officers[officer.id].exp + 18 };
+      const current = officers[officer.id];
+      if (current?.status === 'active') {
+        officers[officer.id] = addOfficerExperience({ ...current, locationRegionId: targetRegion.id }, 18);
       }
     });
   }

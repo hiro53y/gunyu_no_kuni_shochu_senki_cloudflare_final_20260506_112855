@@ -14,9 +14,10 @@
 - サブエージェントレビューで見つかった防衛武将の勢力不整合、登用AP/配置検証、セーブ検証、Service Workerキャッシュ方針を修正。
 - 国絵図背景＋地域ノードのマップUI、武将デザインシート入りカード、SVGミニキャラ戦闘画面へ改修。
 - 下部コマンドの探索・休養を復帰し、進軍は隣接敵領を選択して実行するようUI条件を修正。
+- 追加デバッグで、負傷武将の休養復帰、戦闘経験値の正規化、訓練時の新兵数上限、戦闘スキル演出、実効出陣可能数による進軍判定を修正。
 
 ## 検証
-- 現行Cloudflare最終フォルダで `npm run test` 成功。9件通過。
+- 現行Cloudflare最終フォルダで `npm run test` 成功。12件通過。
 - 現行Cloudflare最終フォルダで `npm run build` 成功。
 - `deliverables/gunyu_no_kuni_shochu_senki_20260506_105904/` で `npm install` 成功。
 - `deliverables/gunyu_no_kuni_shochu_senki_20260506_105904/` で `npm run test` 成功。8件通過。

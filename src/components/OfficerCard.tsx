@@ -26,7 +26,7 @@ export function OfficerCard({ officer, faction, selected, disabled = false, onTo
   const title        = officerTitles[officer.id] ?? '';
   const troopRatio   = officer.troops / officer.maxTroops;
   const staminaRatio = officer.stamina / officer.maxStamina;
-  const isWounded    = officer.stamina < 30;
+  const isWounded    = officer.status === 'wounded' || officer.stamina < 30;
   const artStyle = {
     '--officer-art-position': getOfficerArtPosition(officer),
     '--officer-color': faction.color,
@@ -47,7 +47,11 @@ export function OfficerCard({ officer, faction, selected, disabled = false, onTo
             <CharacterPortrait officer={officer} factionColor={faction.color} size={38} />
           </div>
           <span className="roleTagNew" style={roleBadgeStyle[role]}>{role}</span>
-          {selected && <span className="selectedBadgeNew">{'出陣'}</span>}
+          {(selected || officer.status === 'wounded') && (
+            <span className={`selectedBadgeNew${officer.status === 'wounded' ? ' wounded' : ''}`}>
+              {officer.status === 'wounded' ? '療養' : '出陣'}
+            </span>
+          )}
         </div>
 
         <div className="officerInfo">

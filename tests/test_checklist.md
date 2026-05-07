@@ -7,6 +7,9 @@
 - [x] 進軍勝利時に地域支配が変わる
 - [x] 制圧時に旧防衛武将が制圧地域へ残らない
 - [x] 登用でAPを消費し、候補所在地に配置する
+- [x] 戦闘経験値が100未満に正規化され、レベルアップする
+- [x] 訓練時のレベルアップ後、新しい兵数上限を使う
+- [x] 休養で負傷武将が復帰する
 - [x] セーブデータのserialize/deserializeができる
 - [x] 壊れたセーブデータを拒否する
 - [x] 勝利条件を判定できる
@@ -15,6 +18,7 @@
 - [x] ルートで `npm run build`
 - [x] 検証用deliverables内で `npm run build`
 - [x] 現行Cloudflare最終フォルダで `npm run build`
+- [x] 現行Cloudflare最終フォルダで `npm run test` 12件通過
 
 ## 起動確認
 - [x] build済み `dist` のトップページを簡易HTTPサーバーで配信し、HTTP 200を確認

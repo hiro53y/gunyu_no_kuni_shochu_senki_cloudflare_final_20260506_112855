@@ -76,6 +76,10 @@ function updateOfficerAfterTask(officer: Officer, staminaCost: number, expGain: 
   };
 }
 
+function isRestTarget(officer: Officer): boolean {
+  return officer.factionId === PLAYER_FACTION_ID && (officer.status === 'active' || officer.status === 'wounded');
+}
+
 function officerSkillMultiplier(officer: Officer, focus: DomesticFocus): number {
   return officer.skills.reduce((multiplier, skillId) => {
     const skill = skillCatalog[skillId];
@@ -205,9 +209,10 @@ export function performTrain(state: GameState): ActionOutcome {
       return skill?.trigger === 'train' ? multi * (skill.effect.trainMultiplier ?? 1) : multi;
     }, 1);
     const gain = Math.round((38 + officer.command * 0.55) * skillMultiplier);
+    const updated = updateOfficerAfterTask(officer, 12, 16);
     officers[officer.id] = {
-      ...updateOfficerAfterTask(officer, 12, 16),
-      troops: Math.min(officer.maxTroops, officer.troops + gain),
+      ...updated,
+      troops: Math.min(updated.maxTroops, officer.troops + gain),
     };
     trained += gain;
   });
@@ -423,21 +428,34 @@ export function performRest(state: GameState): ActionOutcome {
   if (guard) {
     return fail(state, guard);
   }
-  const selected = getSelectedOfficers(state).filter((officer) => officer.factionId === PLAYER_FACTION_ID);
+  const selected = state.selectedOfficerIds
+    .map((id) => state.officers[id])
+    .filter((officer): officer is Officer => Boolean(officer) && isRestTarget(officer));
   const targets =
     selected.length > 0
       ? selected.slice(0, 3)
       : Object.values(state.officers)
-          .filter((officer) => officer.factionId === PLAYER_FACTION_ID && officer.status === 'active')
-          .sort((a, b) => a.stamina - b.stamina)
+          .filter(isRestTarget)
+          .sort((a, b) => {
+            if (a.status === 'wounded' && b.status !== 'wounded') {
+              return -1;
+            }
+            if (a.status !== 'wounded' && b.status === 'wounded') {
+              return 1;
+            }
+            return a.stamina - b.stamina;
+          })
           .slice(0, 3);
+  if (targets.length === 0) {
+    return fail(state, '休養できる武将がいない。');
+  }
 
   const officers = { ...state.officers };
   targets.forEach((officer) => {
     officers[officer.id] = {
       ...officer,
       status: officer.status === 'wounded' ? 'active' : officer.status,
-      stamina: Math.min(officer.maxStamina, officer.stamina + 34),
+      stamina: Math.min(officer.maxStamina, Math.max(28, officer.stamina + 34)),
     };
   });
 
