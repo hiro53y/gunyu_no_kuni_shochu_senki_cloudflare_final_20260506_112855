@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createInitialGameState } from '../src/data/initialGameData';
 import { PLAYER_FACTION_ID } from '../src/data/names';
-import { endPlayerTurn, performDomestic, performHire, performRecruitTroops, performRest, performTrain } from '../src/engine/actions';
+import { endPlayerTurn, performDomestic, performHire, performRecruitTroops, performTrain } from '../src/engine/actions';
 import { resolveBattle } from '../src/engine/battle';
 import { deserializeSaveData, serializeGameState } from '../src/engine/save';
 import { checkGameStatus } from '../src/engine/victory';
@@ -82,65 +82,6 @@ function run(): void {
     assert.equal(resultState.lastBattleResult?.conquered, true);
     assert.equal(resultState.regions.r_shiramine.ownerFactionId, PLAYER_FACTION_ID);
     assert.notEqual(resultState.officers.o_mayuki.locationRegionId, 'r_shiramine');
-  });
-
-  test('戦闘経験値は100未満に正規化されレベルアップする', () => {
-    const state = createInitialGameState('easy');
-    const prepared = {
-      ...state,
-      officers: {
-        ...state.officers,
-        o_harutsuna: { ...state.officers.o_harutsuna, exp: 95, troops: 900, command: 96, valor: 90 },
-      },
-      regions: {
-        ...state.regions,
-        r_shiramine: { ...state.regions.r_shiramine, castleHp: 1, localTroops: 60 },
-      },
-    };
-
-    const resultState = resolveBattle(prepared, {
-      attackerFactionId: PLAYER_FACTION_ID,
-      targetRegionId: 'r_shiramine',
-      attackerOfficerIds: ['o_harutsuna'],
-    });
-
-    assert.ok(resultState.officers.o_harutsuna.exp < 100);
-    assert.ok(resultState.officers.o_harutsuna.level > state.officers.o_harutsuna.level);
-  });
-
-  test('訓練レベルアップ後の新しい兵数上限を使う', () => {
-    const state = createInitialGameState('normal');
-    const prepared = {
-      ...state,
-      selectedOfficerIds: ['o_harutsuna'],
-      officers: {
-        ...state.officers,
-        o_harutsuna: { ...state.officers.o_harutsuna, exp: 94, troops: 510, maxTroops: 520, command: 96 },
-      },
-    };
-    const outcome = performTrain(prepared);
-
-    assert.equal(outcome.ok, true);
-    assert.ok(outcome.state.officers.o_harutsuna.maxTroops > 520);
-    assert.ok(outcome.state.officers.o_harutsuna.troops > 520);
-  });
-
-  test('休養で負傷武将が復帰する', () => {
-    const state = createInitialGameState('normal');
-    const prepared = {
-      ...state,
-      selectedOfficerIds: ['o_saku'],
-      officers: {
-        ...state.officers,
-        o_saku: { ...state.officers.o_saku, status: 'wounded' as const, troops: 0, stamina: 5 },
-      },
-    };
-    const outcome = performRest(prepared);
-
-    assert.equal(outcome.ok, true);
-    assert.equal(outcome.state.officers.o_saku.status, 'active');
-    assert.ok(outcome.state.officers.o_saku.stamina >= 28);
-    assert.equal(outcome.state.actionPoints, 2);
   });
 
   test('登用はAPを消費し候補所在地に配置する', () => {

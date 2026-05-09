@@ -1,16 +1,2 @@
-import type { GameState, LogType } from '../types/game';
-
-export function addLog(state: GameState, type: LogType, message: string): GameState {
-  const log = {
-    id: `log_${state.turn}_${state.logs.length}_${state.rngSeed}`,
-    turn: state.turn,
-    type,
-    message,
-    createdAt: Date.now(),
-  };
-
-  return {
-    ...state,
-    logs: [log, ...state.logs].slice(0, 90),
-  };
-}
+// v2.1 で廃止された v1 ファイル。後続フェーズで再構築する。
+export {};

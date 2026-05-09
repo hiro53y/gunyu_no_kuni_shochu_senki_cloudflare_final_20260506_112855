@@ -9,3 +9,7 @@
 | 2026-05-05 | テストはVitestではなくNode実行の軽量テストへ変更 | このWindows/OneDrive環境でVitest/Vite config読込時にspawn EPERMが発生したため。テスト内容は維持し、`npm run test` が安定して通ることを優先した | Codex |
 | 2026-05-05 | npm scriptsのVite起動に `--configLoader native` を指定 | Viteのconfig bundle時にesbuild spawn EPERMが発生したため、Node native loaderでconfig読込を安定させるため | Codex |
 | 2026-05-06 | 旧成果物を上書きせず、最終成果物を別名フォルダで作成 | deliverables内の既存ファイル上書きを避け、生成物を含まないクリーンなパッケージを明確にするため | Codex |
+| 2026-05-06 | Cloudflare Pages向けに広い `_redirects` は置かない | Cloudflare PagesはSPAフォールバックがデフォルトで、`_redirects` は既存アセットにも適用されるため、ViteのJS/CSS配信を壊すリスクを避けるため | Codex |
+| 2026-05-06 | Cloudflare PagesのNode.jsを `.node-version` で22.16.0に固定 | Cloudflare Pagesの現行build image既定値と合い、Vite 7のNode要件を満たすため | Codex |
+| 2026-05-09 | v2.1大改修：伝奇ファンタジー路線へ刷新（八洲・8勢力・武将22名のオリジナル世界観）と指揮官カード合戦システム導入を決定 | 操作性・視覚的訴求力・戦闘の手応えに課題があったため、ジャンルとしての設計パターン（軽量SLG＋指揮官カード戦闘）を踏襲しつつ、世界観・キャラ・絵柄を完全オリジナルで作り直す方針 | Claude |
+| 2026-05-09 | 既存作品からのキャラクター名・立ち絵・ロゴ・UIアセットの直接的流用は引き続き行わない方針を維持 | 知財保護の観点と、本プロジェクトを安全に長期運用するため。設計パターンの踏襲（オマージュ）と直接的流用は明確に区別する | Claude |

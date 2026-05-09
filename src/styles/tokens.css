@@ -1,0 +1,72 @@
+/* =========================================================================
+   群雄ノ國：掌中戦記 v2.1 デザイントークン
+   和風伝奇ファンタジーの色・タイポグラフィを統一する。
+   ========================================================================= */
+
+:root {
+  /* --- 色（和の伝統色ベース） --- */
+  --c-sumi:      #14110F;   /* 墨黒：背景 */
+  --c-sumi-light:#1F1A16;   /* 墨黒うすめ：パネル */
+  --c-sumi-line: #3A322A;   /* 墨の線 */
+  --c-kinari:    #F5EFDF;   /* 生成：主要文字 */
+  --c-kinari-d:  #C4B895;   /* 生成うすめ */
+  --c-shu:       #C84A4A;   /* 朱：強調・自国 */
+  --c-shu-d:     #8C2828;   /* 朱深 */
+  --c-kogane:    #C9A24A;   /* 古金 */
+  --c-kogane-d:  #8C6F22;   /* 古金深 */
+  --c-shikon:    #4A2C66;   /* 紫紺：敵対 */
+  --c-momoiro:   #C97AA0;   /* 桃：浪人系 */
+  --c-aiiro:     #2C4F6E;   /* 藍 */
+  --c-akanesabi: #964A38;   /* 茜錆 */
+
+  /* 勢力カラー */
+  --f-akatsuki:  #C84A4A;
+  --f-kurogane:  #525560;
+  --f-shion:     #7E5BA3;
+  --f-shirasagi: #A8A8B0;
+  --f-honoo:     #D43818;
+  --f-rengein:   #3F8060;
+  --f-youma:     #1A1A1A;
+  --f-ronin:     #1F3A6E;
+
+  /* --- フォント --- */
+  --font-fude: "Yuji Boku", "Klee One", "Yu Mincho", "Noto Serif JP", serif;
+  --font-mincho: "Noto Serif JP", "Yu Mincho", "MS Mincho", serif;
+  --font-mono: "Cica", "MS Gothic", monospace;
+
+  /* --- サイズ --- */
+  --hud-height: 56px;
+  --action-height: 96px;
+  --radius-s: 3px;
+  --radius-m: 6px;
+  --radius-l: 12px;
+
+  /* --- z-index --- */
+  --z-hud: 10;
+  --z-action: 10;
+  --z-popup: 20;
+  --z-modal: 30;
+  --z-toast: 40;
+}
+
+/* base reset */
+* { box-sizing: border-box; }
+html, body, #root {
+  margin: 0; padding: 0;
+  background: var(--c-sumi);
+  color: var(--c-kinari);
+  font-family: var(--font-mincho);
+  font-size: 14px; line-height: 1.55;
+  height: 100%;
+  -webkit-font-smoothing: antialiased;
+}
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+}
+button:disabled { cursor: not-allowed; opacity: 0.4; }
+ul, ol { padding: 0; margin: 0; list-style: none; }
+h1, h2, h3, h4 { margin: 0; font-weight: 500; }

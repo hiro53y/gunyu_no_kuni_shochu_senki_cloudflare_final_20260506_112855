@@ -1,128 +1,183 @@
-import type { Faction, GameState, Region } from '../types/game';
-import { clamp } from './random';
-import { getFactionOfficers, getFactionRegions } from './selectors';
+// ===========================================================================
+// 経済エンジン v2.1
+// ターン終了時の収入・維持費・満足度変動を計算する。
+// すべて純粋関数として実装し、新しい GameState を返す。
+// ===========================================================================
 
-export interface IncomeResult {
-  gold: number;
-  food: number;
-  upkeep: number;
-  netFood: number;
+import type { FactionId, GameState, Region } from '../types/game';
+
+/** 地域からの基礎収入（金）。建設レベルと国力で決まる */
+export function regionIncome(region: Region): number {
+  const base = region.power * 200;
+  const market = region.buildLevels.market * 150;
+  const farm = region.buildLevels.farm * 60;
+  const satisfactionMultiplier = 0.5 + (region.satisfaction / 100);
+  return Math.round((base + market + farm) * satisfactionMultiplier);
 }
 
-export function calculateFactionIncome(state: GameState, factionId: string): IncomeResult {
-  const regions = getFactionRegions(state, factionId);
-  const officers = getFactionOfficers(state, factionId);
-  const officerTroops = officers.reduce((sum, officer) => sum + officer.troops, 0);
-  const localTroops = regions.reduce((sum, region) => sum + region.localTroops, 0);
-  const totalTroops = officerTroops + localTroops;
-
-  const base = regions.reduce(
-    (acc, region) => {
-      const orderFactor = clamp(region.publicOrder / 100, 0.45, 1);
-      const developmentFactor = 1 + region.developmentLevel * 0.06;
-      return {
-        gold: acc.gold + region.riceYield * 0.62 * orderFactor * developmentFactor,
-        food: acc.food + region.riceYield * 1.22 * orderFactor * developmentFactor,
-      };
-    },
-    { gold: 0, food: 0 },
-  );
-
-  const upkeep = Math.ceil(totalTroops / 55);
-  const difficultyFoodBonus = state.difficulty === 'hard' && !state.factions[factionId].isPlayer ? 18 : 0;
-
-  return {
-    gold: Math.max(0, Math.round(base.gold)),
-    food: Math.max(0, Math.round(base.food + difficultyFoodBonus)),
-    upkeep,
-    netFood: Math.round(base.food + difficultyFoodBonus - upkeep),
-  };
+/** 地域からの基礎兵糧 */
+export function regionFood(region: Region): number {
+  const base = region.power * 80;
+  const farm = region.buildLevels.farm * 200;
+  return Math.round(base + farm);
 }
 
-export function applyFactionIncome(state: GameState, factionId: string): GameState {
-  const income = calculateFactionIncome(state, factionId);
-  const faction = state.factions[factionId];
-  const moraleDelta = income.netFood < 0 ? -2 : 1;
+/** 武将維持費 */
+export function generalUpkeep(troopCurrent: number, isUnique: boolean): number {
+  return Math.round(troopCurrent * (isUnique ? 0.4 : 0.5));
+}
 
-  return {
+interface TickResult {
+  treasuryDelta: number;
+  foodDelta: number;
+  log: string[];
+}
+
+/** 1勢力分の経済処理 */
+export function tickFactionEconomy(state: GameState, factionId: FactionId): TickResult {
+  const log: string[] = [];
+  let treasuryDelta = 0;
+  let foodDelta = 0;
+
+  for (const region of Object.values(state.regions)) {
+    if (region.factionId !== factionId) continue;
+    treasuryDelta += regionIncome(region);
+    foodDelta += regionFood(region);
+  }
+
+  for (const g of Object.values(state.generals)) {
+    if (g.factionId !== factionId) continue;
+    if (g.status !== 'free' && g.status !== 'recruited') continue;
+    const upkeep = generalUpkeep(g.troopCurrent, g.isUnique);
+    treasuryDelta -= upkeep;
+    foodDelta -= Math.round(g.troopCurrent * 0.5);
+  }
+
+  return { treasuryDelta, foodDelta, log };
+}
+
+/** 全勢力に対して経済処理を一括適用し、新 state を返す */
+export function applyEconomyTick(state: GameState): GameState {
+  const next: GameState = {
     ...state,
-    factions: {
-      ...state.factions,
-      [factionId]: {
-        ...faction,
-        gold: Math.max(0, faction.gold + income.gold),
-        food: Math.max(0, faction.food + income.netFood),
-        morale: clamp(faction.morale + moraleDelta, 25, 95),
+    factions: { ...state.factions },
+  };
+  const factionIds = Object.keys(state.factions) as FactionId[];
+
+  for (const fid of factionIds) {
+    const r = tickFactionEconomy(state, fid);
+    const f = state.factions[fid];
+    next.factions[fid] = {
+      ...f,
+      treasury: Math.max(0, f.treasury + r.treasuryDelta),
+      food: Math.max(0, f.food + r.foodDelta),
+    };
+  }
+
+  return next;
+}
+
+/** 満足度の自然減（毎ターン -1）と、HUD用平均満足度の更新 */
+export function applySatisfactionDrift(state: GameState): GameState {
+  const next: GameState = { ...state, regions: { ...state.regions } };
+  for (const id of Object.keys(state.regions)) {
+    const r = state.regions[id];
+    next.regions[id] = {
+      ...r,
+      satisfaction: clamp(r.satisfaction - 1, 0, 100),
+    };
+  }
+
+  const playerRegions = Object.values(next.regions).filter((r) => r.factionId === 'akatsuki');
+  if (playerRegions.length > 0) {
+    const avg = playerRegions.reduce((s, r) => s + r.satisfaction, 0) / playerRegions.length;
+    next.satisfaction = Math.round(avg);
+  }
+  return next;
+}
+
+/** 得点計算（HUD表示用） */
+export function computeScore(state: GameState): number {
+  let score = 0;
+  for (const r of Object.values(state.regions)) {
+    if (r.factionId === 'akatsuki') score += 50;
+  }
+  for (const g of Object.values(state.generals)) {
+    if (g.status === 'dead' && g.homeFactionId === 'youma') score += 30;
+  }
+  return score;
+}
+
+/** 建設アクションの効果を反映する（金・国力・満足度を消費） */
+export function applyBuildAction(
+  state: GameState,
+  regionId: string,
+  type: 'farm' | 'wall' | 'market' | 'forge'
+): { state: GameState; ok: boolean; message: string } {
+  const region = state.regions[regionId];
+  if (!region) return { state, ok: false, message: '地域が見つかりません' };
+  if (region.factionId !== 'akatsuki') return { state, ok: false, message: '自国地域のみ建設できます' };
+
+  const current = region.buildLevels[type];
+  if (current >= 5) return { state, ok: false, message: 'すでに最大レベルです' };
+  const cost = 800 + current * 400;
+
+  const akatsuki = state.factions.akatsuki;
+  if (akatsuki.treasury < cost) return { state, ok: false, message: '金が不足しています' };
+
+  return {
+    state: {
+      ...state,
+      factions: {
+        ...state.factions,
+        akatsuki: { ...akatsuki, treasury: akatsuki.treasury - cost },
+      },
+      regions: {
+        ...state.regions,
+        [regionId]: {
+          ...region,
+          buildLevels: { ...region.buildLevels, [type]: current + 1 },
+          power: Math.min(10, region.power + (type === 'farm' || type === 'market' ? 1 : 0)),
+        },
       },
     },
+    ok: true,
+    message: `${region.name}で${labelOfBuild(type)}を強化した（Lv${current + 1}）`,
   };
 }
 
-export function improveRegion(region: Region, focus: 'riceYield' | 'publicOrder' | 'castleHp' | 'developmentLevel', amount: number): Region {
-  if (focus === 'riceYield') {
-    return { ...region, riceYield: Math.min(150, region.riceYield + Math.round(amount)) };
-  }
-  if (focus === 'publicOrder') {
-    return { ...region, publicOrder: Math.min(100, region.publicOrder + Math.round(amount)) };
-  }
-  if (focus === 'castleHp') {
-    return { ...region, castleHp: Math.min(region.maxCastleHp, region.castleHp + Math.round(amount)) };
-  }
-  return { ...region, developmentLevel: Math.min(8, region.developmentLevel + 1) };
-}
+/** 徴収：金を一時的に得るが満足度が下がる */
+export function applyCollectAction(
+  state: GameState,
+  regionId: string
+): { state: GameState; ok: boolean; message: string; gained: number } {
+  const region = state.regions[regionId];
+  if (!region) return { state, ok: false, message: '地域が見つかりません', gained: 0 };
+  if (region.factionId !== 'akatsuki') return { state, ok: false, message: '自国地域のみ徴収できます', gained: 0 };
 
-export function applyRegionAttrition(state: GameState, factionId: string): GameState {
-  const faction = state.factions[factionId];
-  if (faction.food > 0) {
-    return state;
-  }
-
-  const officers = getFactionOfficers(state, factionId);
-  const regions = getFactionRegions(state, factionId);
-  const officersUpdate = { ...state.officers };
-  const regionsUpdate = { ...state.regions };
-
-  officers.forEach((officer) => {
-    officersUpdate[officer.id] = {
-      ...officer,
-      troops: Math.max(20, Math.floor(officer.troops * 0.96)),
-      stamina: Math.max(10, officer.stamina - 4),
-    };
-  });
-
-  regions.forEach((region) => {
-    regionsUpdate[region.id] = {
-      ...region,
-      localTroops: Math.max(40, Math.floor(region.localTroops * 0.97)),
-      publicOrder: Math.max(20, region.publicOrder - 2),
-    };
-  });
-
+  const gained = Math.round(region.power * 600 * (region.satisfaction / 100));
   return {
-    ...state,
-    officers: officersUpdate,
-    regions: regionsUpdate,
-    factions: {
-      ...state.factions,
-      [factionId]: {
-        ...faction,
-        morale: Math.max(25, faction.morale - 3),
+    state: {
+      ...state,
+      factions: {
+        ...state.factions,
+        akatsuki: { ...state.factions.akatsuki, treasury: state.factions.akatsuki.treasury + gained },
+      },
+      regions: {
+        ...state.regions,
+        [regionId]: { ...region, satisfaction: clamp(region.satisfaction - 15, 0, 100) },
       },
     },
+    ok: true,
+    message: `${region.name}から ${gained.toLocaleString()}金を徴収（満足度-15）`,
+    gained,
   };
 }
 
-export function applyMonthlyRecovery(state: GameState): GameState {
-  const officers = { ...state.officers };
-  Object.values(officers).forEach((officer) => {
-    if (officer.status !== 'active') {
-      return;
-    }
-    officers[officer.id] = {
-      ...officer,
-      stamina: Math.min(officer.maxStamina, officer.stamina + 5),
-    };
-  });
+function labelOfBuild(t: 'farm' | 'wall' | 'market' | 'forge'): string {
+  return { farm: '田畑', wall: '城壁', market: '市場', forge: '鍛冶場' }[t];
+}
 
-  return { ...state, officers };
+function clamp(v: number, lo: number, hi: number): number {
+  return Math.min(Math.max(v, lo), hi);
 }
