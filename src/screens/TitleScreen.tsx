@@ -9,6 +9,7 @@ import type { GameState, GameConfig } from '../types/game';
 import { hasSave, hasAutoSave, loadGame, loadAutoSave, deleteSave } from '../engine';
 import { createNewGame } from '../createGame';
 import { SettingsDialog } from '../components/SettingsDialog';
+import { audio } from '../audio/AudioManager';
 
 interface Props {
   config: GameConfig;
@@ -22,21 +23,24 @@ export function TitleScreen({ config, onConfigChange, onStartGame }: Props) {
   const saveAvailable = hasSave();
 
   function handleNew() {
+    audio.play('click');
     const initial = createNewGame();
-    // 既に設定がある場合は引き継ぐ
     onStartGame({ ...initial, config });
   }
   function handleContinue() {
+    audio.play('click');
     const r = loadAutoSave();
     if (r.ok && r.state) onStartGame(r.state);
-    else alert(r.error ?? 'コンティニューできません');
+    else { audio.play('fail'); alert(r.error ?? 'コンティニューできません'); }
   }
   function handleLoad() {
+    audio.play('click');
     const r = loadGame();
     if (r.ok && r.state) onStartGame(r.state);
-    else alert(r.error ?? 'ロードできません');
+    else { audio.play('fail'); alert(r.error ?? 'ロードできません'); }
   }
   function handleDelete() {
+    audio.play('tap');
     if (window.confirm('セーブデータを削除しますか？')) {
       deleteSave();
       window.location.reload();
@@ -103,7 +107,7 @@ export function TitleScreen({ config, onConfigChange, onStartGame }: Props) {
 
       {showSettings && (
         <SettingsDialog
-          config={config}
+         config={config}
           onChange={onConfigChange}
           onClose={() => setShowSettings(false)}
         />

@@ -1,13 +1,15 @@
 // ===========================================================================
 // 群雄ノ國：掌中戦記 v2.1 アプリエントリ
 // タイトル画面 ↔ 地図画面のスクリーンルーター
-// 設定（fontSize / animationsDisabled）を <html> に data 属性として反映
+// 設定（fontSize / animationsDisabled / volume）を <html> に data 属性として反映
+// 初回ユーザー操作で AudioManager を起動
 // ===========================================================================
 
 import { useEffect, useState } from 'react';
 import type { GameState, GameConfig } from './types/game';
 import { TitleScreen } from './screens/TitleScreen';
 import { MapScreen } from './screens/MapScreen';
+import { audio } from './audio/AudioManager';
 import './styles/tokens.css';
 import './styles/screens.css';
 
@@ -35,7 +37,6 @@ function saveConfig(c: GameConfig): void {
   try { window.localStorage.setItem(CONFIG_KEY, JSON.stringify(c)); } catch { /* ignore */ }
 }
 
-/** <html> に data-属性で反映 */
 function applyConfigToRoot(c: GameConfig): void {
   const root = document.documentElement;
   root.setAttribute('data-font-size', c.fontSize);
@@ -50,6 +51,7 @@ export default function App() {
   useEffect(() => {
     applyConfigToRoot(config);
     saveConfig(config);
+    audio.setVolumes(config.sfxVolume, config.musicVolume);
   }, [config]);
 
   useEffect(() => {
@@ -58,6 +60,21 @@ export default function App() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state?.config]);
+
+  // 初回ユーザー操作で AudioContext を起動するための workaround
+  useEffect(() => {
+    const init = () => {
+      audio.play('tap');
+      window.removeEventListener('pointerdown', init);
+      window.removeEventListener('keydown', init);
+    };
+    window.addEventListener('pointerdown', init, { once: true });
+    window.addEventListener('keydown', init, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', init);
+      window.removeEventListener('keydown', init);
+    };
+  }, []);
 
   function handleStartGame(s: GameState) {
     setState({ ...s, config });

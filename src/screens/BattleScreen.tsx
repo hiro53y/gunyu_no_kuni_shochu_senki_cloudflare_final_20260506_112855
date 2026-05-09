@@ -15,6 +15,7 @@ import {
   type ActorRef,
 } from '../engine';
 import { getSkill } from '../data/skills';
+import { audio } from '../audio/AudioManager';
 
 interface Props {
   state: GameState;
@@ -74,9 +75,11 @@ export function BattleScreen({ state, initialBattle, onComplete }: Props) {
     };
 
     if (willCutIn) {
+      audio.play('cutIn');
       setCutIn({ general: g, skillName: aiSkill.name, dialogue: aiSkill.cutInDialogue, side: 'enemy' });
       window.setTimeout(proceed, 1700);
     } else {
+      audio.play('attack');
       window.setTimeout(proceed, AI_DELAY_MS);
     }
   }, [state]);
@@ -148,9 +151,17 @@ export function BattleScreen({ state, initialBattle, onComplete }: Props) {
     };
 
     if (g && skill.cutInDialogue) {
+      audio.play('cutIn');
       setCutIn({ general: g, skillName: skill.name, dialogue: skill.cutInDialogue, side: 'player' });
       window.setTimeout(proceed, 1700);
+    } else if (skill.kind === 'heal') {
+      audio.play('heal');
+      window.setTimeout(proceed, 250);
+    } else if (skill.kind === 'support') {
+      audio.play('skill');
+      window.setTimeout(proceed, 250);
     } else {
+      audio.play('attack');
       window.setTimeout(proceed, 250);
     }
   }

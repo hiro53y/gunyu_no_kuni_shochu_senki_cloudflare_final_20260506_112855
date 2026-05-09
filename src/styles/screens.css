@@ -1075,3 +1075,177 @@
   animation-duration: 0s !important;
   transition-duration: 0s !important;
 }
+
+/* =========================================================================
+   合戦前の配置画面
+   ========================================================================= */
+.placementScreen {
+  position: fixed; inset: 0;
+  display: grid;
+  grid-template-rows: 48px 1fr auto auto;
+  background:
+    radial-gradient(ellipse at 50% 50%, rgba(140, 80, 47, 0.10), transparent 60%),
+    var(--c-sumi);
+  overflow: hidden;
+}
+
+.placementHud {
+  display: flex; align-items: center; gap: 14px;
+  padding: 0 12px;
+  background: linear-gradient(180deg, var(--c-sumi-light) 0%, var(--c-sumi) 100%);
+  border-bottom: 1px solid var(--c-shu-d);
+  font-size: 12px;
+  overflow-x: auto; white-space: nowrap;
+}
+.placementHudGroup { display: flex; align-items: center; gap: 6px; }
+.placementHudGroup .label { color: var(--c-kinari-d); font-size: 10px; }
+.placementHudGroup .value {
+  color: var(--c-kogane); font-family: var(--font-fude);
+  letter-spacing: 2px; font-size: 14px;
+}
+
+.placementBody {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  padding: 12px;
+  overflow-y: auto;
+}
+@media (min-width: 720px) {
+  .placementBody { grid-template-columns: 2fr 1fr; }
+}
+
+.placementSubTitle {
+  font-family: var(--font-fude);
+  font-size: 13px; color: var(--c-kogane);
+  letter-spacing: 4px;
+  border-bottom: 1px solid var(--c-sumi-line);
+  padding-bottom: 4px; margin-bottom: 8px;
+}
+
+.placementSlots { min-width: 0; }
+.placementSlotList {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 8px; margin-bottom: 12px;
+}
+.placementSlot {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 8px;
+  background: var(--c-sumi-light);
+  border: 1px dashed var(--c-sumi-line);
+  border-radius: var(--radius-s);
+  color: var(--c-kinari);
+  font-size: 11px;
+  min-height: 130px;
+  transition: all 0.15s ease;
+}
+.placementSlot.filled {
+  border-style: solid;
+  border-color: var(--c-kogane);
+}
+.placementSlot.empty.highlight {
+  border-color: var(--c-shu);
+  background: rgba(200, 74, 74, 0.08);
+}
+.placementSlot:hover:not(:disabled) { border-color: var(--c-kogane); }
+.placementSlot .rowLabel {
+  font-family: var(--font-fude);
+  font-size: 11px;
+  color: var(--c-kinari-d);
+  letter-spacing: 2px;
+}
+.placementSlot .slotMeta { text-align: center; }
+.placementSlot .slotName { font-size: 12px; color: var(--c-kogane); }
+.placementSlot .slotStats { font-size: 10px; color: var(--c-kinari-d); }
+.placementSlot .emptyHint { font-size: 11px; color: var(--c-kinari-d); font-style: italic; }
+
+.placementButtons { display: flex; gap: 8px; flex-wrap: wrap; }
+.phantBtn {
+  padding: 6px 14px;
+  background: var(--c-sumi-light);
+  border: 1px solid var(--c-sumi-line);
+  border-radius: var(--radius-s);
+  color: var(--c-kinari);
+  font-family: var(--font-fude); letter-spacing: 2px;
+  font-size: 12px;
+}
+.phantBtn:hover:not(:disabled) {
+  border-color: var(--c-kogane); color: var(--c-kogane);
+}
+.phantBtn.cancel { border-color: var(--c-sumi-line); color: var(--c-kinari-d); }
+.phantBtn.confirm {
+  background: var(--c-shu); color: var(--c-kinari); border-color: var(--c-shu);
+  font-size: 14px; padding: 10px 28px;
+}
+.phantBtn.confirm.disabled,
+.phantBtn:disabled {
+  opacity: 0.4; cursor: not-allowed;
+  background: var(--c-sumi); color: var(--c-kinari-d); border-color: var(--c-sumi-line);
+}
+
+.placementEnemyPreview {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--c-shu-d);
+  border-radius: var(--radius-s);
+  padding: 10px;
+}
+.enemyPreviewRow {
+  display: flex; gap: 8px; align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--c-sumi-line);
+}
+.enemyPreviewRow:last-child { border-bottom: none; }
+
+.placementRoster {
+  padding: 0 12px 12px;
+  border-top: 1px solid var(--c-sumi-line);
+  background: var(--c-sumi);
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.rosterGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
+}
+.rosterCard {
+  position: relative;
+  display: flex; gap: 8px; align-items: center;
+  padding: 6px;
+  background: var(--c-sumi-light);
+  border: 1px solid var(--c-sumi-line);
+  border-radius: var(--radius-s);
+  color: var(--c-kinari);
+  text-align: left;
+  font-size: 11px;
+}
+.rosterCard:hover:not(:disabled) { border-color: var(--c-kogane); }
+.rosterCard.placed {
+  opacity: 0.55;
+  border-color: var(--c-shu-d);
+}
+.rosterCard.selected {
+  border-color: var(--c-shu);
+  box-shadow: 0 0 0 2px rgba(200, 74, 74, 0.4);
+}
+.rosterMeta { flex: 1; min-width: 0; }
+.rosterName {
+  font-size: 12px; color: var(--c-kinari);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rosterStats { font-size: 10px; color: var(--c-kinari-d); }
+.rosterTroops { font-size: 10px; color: var(--c-kogane); }
+.placedBadge {
+  position: absolute; top: 4px; right: 4px;
+  padding: 1px 4px;
+  background: var(--c-shu-d); color: var(--c-kinari);
+  font-size: 9px; border-radius: 1px;
+}
+
+.placementFooter {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px;
+  background: linear-gradient(0deg, var(--c-sumi-light), var(--c-sumi));
+  border-top: 1px solid var(--c-shu-d);
+}

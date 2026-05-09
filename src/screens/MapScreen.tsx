@@ -1,11 +1,11 @@
 // ===========================================================================
 // 地図画面（メイン）
 // HUD + 操作リスト + 八洲マップ + 地域パネル + アクションバー
-// 合戦・登用・武将詳細・結果表示・設定をモーダルで切替
+// 合戦コマンドは配置画面 → 合戦画面の順に遷移
 // ===========================================================================
 
 import { useCallback, useState } from 'react';
-import type { BattleState, GameState, General, RegionId, GameConfig } from '../types/game';
+import type { BattleState, GameState, General, GeneralId, RegionId, GameConfig } from '../types/game';
 import { Hud } from '../components/Hud';
 import { YashimaMap } from '../components/YashimaMap';
 import { RegionPanel, RegionPopup } from '../components/RegionPanel';
@@ -16,12 +16,14 @@ import { GeneralDetail } from '../components/GeneralDetail';
 import { ResultOverlay } from '../components/ResultOverlay';
 import { SettingsDialog } from '../components/SettingsDialog';
 import { BattleScreen } from './BattleScreen';
+import { BattlePlacementScreen } from './BattlePlacementScreen';
 import {
   applyBuildAction, applyCollectAction,
   attemptPersuade, hireRonin,
   initBattle, finalizeBattle, createRng,
 } from '../engine';
 import { applyScoutAction, applyRestAction, endTurn, consumeAp } from '../createGame';
+import { audio } from '../audio/AudioManager';
 
 interface Props {
   state: GameState;
@@ -37,6 +39,7 @@ export function MapScreen({ state, setState, onReturnTitle }: Props) {
   const [overlay, setOverlay] = useState<OverlayKind>(null);
   const [detailGeneralId, setDetailGeneralId] = useState<string | null>(null);
   const [activeBattle, setActiveBattle] = useState<BattleState | null>(null);
+  const [pendingBattleRegion, setPendingBattleRegion] = useState<RegionId | null>(null);
 
   const flash = useCallback((msg: string) => {
     setNotice(msg);
@@ -47,19 +50,20 @@ export function MapScreen({ state, setState, onReturnTitle }: Props) {
     setState((s) => ({ ...s, config: next }));
   }, [setState]);
 
-  // --- 合戦の起動 -------------------------------------------------------
+  // --- 合戦の起動（配置画面経由） -----------------------------------------
 
-  const startBattle = useCallback((targetRegionId: RegionId) => {
+  const handleBattleStart = useCallback((targetRegionId: RegionId) => {
     const region = state.regions[targetRegionId];
     if (!region) return;
     if (state.ap < 1) { flash('行動回数が足りません'); return; }
+    audio.play('click');
+    setPendingBattleRegion(targetRegionId);
+  }, [state, flash]);
 
-    const playerForce = Object.values(state.generals)
-      .filter((g) => g.factionId === 'akatsuki')
-      .filter((g) => g.troopCurrent > 0)
-      .sort((a, b) => (b.stats.power + b.stats.command) - (a.stats.power + a.stats.command))
-      .slice(0, 3)
-      .map((g) => g.id);
+  const handlePlacementConfirm = useCallback((playerSlots: (GeneralId | null)[]) => {
+    if (!pendingBattleRegion) return;
+    const region = state.regions[pendingBattleRegion];
+    if (!region) return;
 
     const enemyFid = region.factionId;
     const enemyForce = enemyFid
@@ -71,13 +75,6 @@ export function MapScreen({ state, setState, onReturnTitle }: Props) {
           .map((g) => g.id)
       : [];
 
-    if (playerForce.length === 0) { flash('出陣可能な武将がいません'); return; }
-
-    const playerSlots = [
-      playerForce[0] ?? null, null, null,
-      playerForce[1] ?? null, null, null,
-      playerForce[2] ?? null, null, null,
-    ];
     const enemySlots = [
       enemyForce[0] ?? null, null, null,
       enemyForce[1] ?? null, null, null,
@@ -87,7 +84,7 @@ export function MapScreen({ state, setState, onReturnTitle }: Props) {
     setState((s) => ({ ...s, ap: Math.max(0, s.ap - 1) }));
 
     const battle = initBattle(state, {
-      regionId: targetRegionId,
+      regionId: pendingBattleRegion,
       playerIsAttacker: true,
       attackerFactionId: 'akatsuki',
       defenderFactionId: enemyFid ?? 'ronin',
@@ -95,7 +92,12 @@ export function MapScreen({ state, setState, onReturnTitle }: Props) {
       enemyGeneralIds: enemySlots,
     });
     setActiveBattle(battle);
-  }, [state, setState, flash]);
+    setPendingBattleRegion(null);
+  }, [state, setState, pendingBattleRegion]);
+
+  const handlePlacementCancel = useCallback(() => {
+    setPendingBattleRegion(null);
+  }, []);
 
   const completeBattle = useCallback((finalBattle: BattleState) => {
     setState((s) => {
@@ -108,28 +110,34 @@ export function MapScreen({ state, setState, onReturnTitle }: Props) {
       enemy_win:  '合戦に敗北…',
       draw:       '引き分け',
     };
+    if (finalBattle.result === 'player_win') audio.play('victory');
+    else if (finalBattle.result === 'enemy_win') audio.play('defeat');
+    else audio.play('turnEnd');
     flash(messageMap[finalBattle.result] ?? '');
     setActiveBattle(null);
   }, [setState, flash]);
 
-  // --- その他コマンドのハンドラ ----------------------------------------
+  // --- その他コマンドのハンドラ -----------------------------------------
 
   const handleAction = useCallback((action: ActionKind) => {
     if (action === 'endTurn') {
+      audio.play('turnEnd');
       setState((s) => endTurn(s));
       flash('ターン終了');
       return;
     }
     if (action === 'recruit') {
+      audio.play('click');
       setOverlay('recruit');
       return;
     }
     if (action === 'battle') {
       if (!selectedId) return;
-      startBattle(selectedId);
+      handleBattleStart(selectedId);
       return;
     }
     if (!selectedId && action !== 'rest') return;
+    audio.play('click');
 
     setState((s) => {
       const after = (() => {
@@ -137,27 +145,27 @@ export function MapScreen({ state, setState, onReturnTitle }: Props) {
           case 'build': {
             const r = applyBuildAction(s, selectedId!, 'farm');
             flash(r.message);
-            if (!r.ok) return s;
+            if (!r.ok) { audio.play('fail'); return s; }
             const consumed = consumeAp(r.state, 1);
             return consumed.ok ? consumed.state : r.state;
           }
           case 'collect': {
             const r = applyCollectAction(s, selectedId!);
             flash(r.message);
-            if (!r.ok) return s;
+            if (!r.ok) { audio.play('fail'); return s; }
             const consumed = consumeAp(r.state, 1);
             return consumed.ok ? consumed.state : r.state;
           }
           case 'sabotage': {
             const r = applyScoutAction(s, selectedId!);
             flash(r.message);
-            if (!r.ok) return s;
+            if (!r.ok) { audio.play('fail'); return s; }
             const consumed = consumeAp(r.state, 1);
             return consumed.ok ? consumed.state : r.state;
           }
           case 'scout': {
             const consumed = consumeAp(s, 1);
-            if (!consumed.ok) { flash('行動回数が足りません'); return s; }
+            if (!consumed.ok) { flash('行動回数が足りません'); audio.play('fail'); return s; }
             const region = s.regions[selectedId!];
             if (!region) { flash('地域が見つかりません'); return s; }
             const gain = 800;
@@ -174,6 +182,7 @@ export function MapScreen({ state, setState, onReturnTitle }: Props) {
             const playerGenerals = Object.values(s.generals)
               .filter((g) => g.factionId === 'akatsuki')
               .map((g) => g.id);
+            audio.play('heal');
             flash('武将が休養した');
             return applyRestAction(s, playerGenerals);
           }
@@ -182,12 +191,14 @@ export function MapScreen({ state, setState, onReturnTitle }: Props) {
       })();
       return after;
     });
-  }, [selectedId, setState, flash, startBattle]);
+  }, [selectedId, setState, flash, handleBattleStart]);
 
   const handlePersuade = useCallback((id: string) => {
     setState((s) => {
       const rng = createRng(s.rngSeed);
       const r = attemptPersuade(s, id, rng);
+      if (r.ok) audio.play('levelUp');
+      else audio.play('fail');
       flash(r.message);
       return r.state;
     });
@@ -196,6 +207,8 @@ export function MapScreen({ state, setState, onReturnTitle }: Props) {
   const handleHire = useCallback((id: string) => {
     setState((s) => {
       const r = hireRonin(s, id);
+      if (r.ok) audio.play('levelUp');
+      else audio.play('fail');
       flash(r.message);
       return r.state;
     });
@@ -205,7 +218,7 @@ export function MapScreen({ state, setState, onReturnTitle }: Props) {
     setDetailGeneralId(g.id);
   }, []);
 
-  // --- 合戦中は BattleScreen を表示 ------------------------------------
+  // --- 配置画面 → 合戦画面 → 地図 の優先順 ------------------------------
 
   if (activeBattle) {
     return (
@@ -216,18 +229,28 @@ export function MapScreen({ state, setState, onReturnTitle }: Props) {
       />
     );
   }
+  if (pendingBattleRegion) {
+    return (
+      <BattlePlacementScreen
+        state={state}
+        regionId={pendingBattleRegion}
+        onConfirm={handlePlacementConfirm}
+        onCancel={handlePlacementCancel}
+      />
+    );
+  }
 
   const detailGeneral = detailGeneralId ? state.generals[detailGeneralId] : null;
 
   return (
     <div className="mapScreen">
-      <Hud state={state} onOpenMenu={() => setOverlay('settings')} />
+      <Hud state={state} onOpenMenu={() => { audio.play('tap'); setOverlay('settings'); }} />
 
       <div className="mapBody">
         <OperationList state={state} />
 
         <div className="mapArea">
-          <YashimaMap state={state} selectedId={selectedId} onSelect={setSelectedId} />
+          <YashimaMap state={state} selectedId={selectedId} onSelect={(id) => { audio.play('tap'); setSelectedId(id); }} />
           <RegionPopup state={state} regionId={selectedId} />
         </div>
 

@@ -1,4 +1,10 @@
-const CACHE_NAME = 'gunyu-no-kuni-v2';
+// 群雄ノ國：掌中戦記 v2.1 Service Worker
+// - APP SHELL は事前キャッシュ
+// - 立ち絵 (/assets/portraits/) は network-first（新規追加が即反映されるため）
+// - その他 GET リクエストは cache-first（バンドルアセット等）
+// - 失敗レスポンス（4xx/5xx）はキャッシュしない
+
+const CACHE_NAME = 'gunyu-no-kuni-v3';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg'];
 
 self.addEventListener('install', (event) => {
@@ -19,19 +25,45 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+function isOk(response) {
+  return response && response.ok && response.status >= 200 && response.status < 300;
+}
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') {
     return;
   }
 
   const requestUrl = new URL(event.request.url);
-  const isNavigation = event.request.mode === 'navigate' || requestUrl.pathname === '/' || requestUrl.pathname.endsWith('.html');
+
+  // 立ち絵は network-first（新規追加・差替が即反映されるように）
+  if (requestUrl.pathname.startsWith('/assets/portraits/')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (isOk(response)) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request).then((cached) => cached || new Response('', { status: 404 }))),
+    );
+    return;
+  }
+
+  const isNavigation =
+    event.request.mode === 'navigate' ||
+    requestUrl.pathname === '/' ||
+    requestUrl.pathname.endsWith('.html');
   if (isNavigation) {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          if (isOk(response)) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
           return response;
         })
         .catch(() => caches.match(event.request).then((cached) => cached || caches.match('/index.html'))),
@@ -44,11 +76,12 @@ self.addEventListener('fetch', (event) => {
       if (cached) {
         return cached;
       }
-
       return fetch(event.request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          if (isOk(response)) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
           return response;
         })
         .catch(() => caches.match('/index.html'));
