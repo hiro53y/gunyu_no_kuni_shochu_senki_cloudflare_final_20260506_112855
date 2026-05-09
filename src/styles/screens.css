@@ -1249,3 +1249,349 @@
   background: linear-gradient(0deg, var(--c-sumi-light), var(--c-sumi));
   border-top: 1px solid var(--c-shu-d);
 }
+
+/* =========================================================================
+   モバイル特化修正（2026-05-09 v2.1.1）
+   ========================================================================= */
+
+/* iOS Safari の dvh 対応・safe-area パディング */
+.mapScreen,
+.battleScreen,
+.placementScreen,
+.titleScreen {
+  inset: 0;
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* mapScreen 行高を固定→自然サイズへ。下部 safe-area を吸収 */
+.mapScreen {
+  grid-template-rows: auto 1fr auto;
+}
+.battleScreen {
+  grid-template-rows: auto 1fr auto auto;
+}
+.placementScreen {
+  grid-template-rows: auto 1fr auto auto;
+}
+
+/* HUDをコンパクト化・wrap 許可 */
+.hud {
+  flex-wrap: wrap;
+  padding: 4px 10px max(4px, env(safe-area-inset-top)) 10px;
+  gap: 8px;
+  font-size: 11px;
+  min-height: 44px;
+}
+.hud .hudGroup .label { font-size: 9px; }
+.hud .hudGroup .value { font-size: 12px; }
+.hud .hudGroup.turn .value { font-size: 14px; }
+.hud .hudGroup.ap .dot { width: 8px; height: 8px; }
+
+@media (max-width: 480px) {
+  .hud { gap: 6px; font-size: 10px; }
+  .hud .hudGroup { gap: 2px; }
+  .hud .hudGroup .label { display: none; }  /* スマホでは label 省略 */
+  .hud .hudGroup .value { font-size: 11px; }
+  .hud .hudGroup.turn .value { font-size: 13px; }
+  /* 数字の前に絵記号を付与して意味を伝える */
+  .hud .hudGroup:nth-child(4) .value::before { content: '金 '; color: var(--c-kinari-d); }
+  .hud .hudGroup:nth-child(5) .value::before { content: '糧 '; color: var(--c-kinari-d); }
+  .hud .hudGroup:nth-child(6) .value::before { content: '満 '; color: var(--c-kinari-d); }
+  .hud .hudGroup:nth-child(7) .value::before { content: '点 '; color: var(--c-kinari-d); }
+  .hud .hudGroup:nth-child(8) .value::before { content: '支 '; color: var(--c-kinari-d); }
+}
+
+/* マップエリアの黒帯を解消：地域詳細を下にインライン配置 */
+@media (max-width: 899px) {
+  .mapBody {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: 1fr auto !important;
+  }
+  .mapArea {
+    min-height: 0;
+  }
+  /* スマホ用ポップアップを通常フローへ */
+  .regionPopup {
+    position: static;
+    display: block;
+    margin: 0;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-top: 1px solid var(--c-kogane);
+    border-bottom: none;
+    pointer-events: auto;
+    background: var(--c-sumi-light);
+  }
+  .yashimaMap {
+    /* SVGを縦に詰める（meet維持で問題なくなる） */
+    height: 100%;
+  }
+}
+
+/* アクションバー：safe-area 対応＋全ボタン視認可能に */
+.actionBar {
+  grid-template-columns: repeat(4, 1fr);
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+  gap: 4px;
+}
+.actionBar button {
+  padding: 6px 2px;
+  min-height: 44px;
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+.actionBar button .actIcon { font-size: 16px; }
+
+@media (min-width: 600px) {
+  .actionBar { grid-template-columns: repeat(8, 1fr); }
+  .actionBar button { font-size: 11px; }
+}
+
+/* =========================================================================
+   合戦画面のレイアウト見直し
+   ========================================================================= */
+
+/* HUDコンパクト化と「降伏」ボタンの再配置 */
+.battleHud {
+  flex-wrap: wrap;
+  padding: 4px 10px max(4px, env(safe-area-inset-top)) 10px;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 11px;
+}
+.battleHud .battleHudGroup .label { font-size: 9px; }
+.battleHud .battleHudGroup .value { font-size: 12px; }
+.battleHud .battleHudGroup.phase .value { font-size: 13px; }
+
+@media (max-width: 480px) {
+  .battleHud .battleHudGroup .label { display: none; }
+  .battleHud .battleHudGroup.phase {
+    flex: 1 1 100%;  /* phase だけ次の行に置く */
+    margin-left: 0 !important;
+    text-align: center;
+  }
+}
+
+/* 戦闘場：3×3 から 1列スタックへ。空スロットは非表示 */
+.battleField {
+  grid-template-columns: 1fr auto 1fr;
+  gap: 6px;
+  padding: 6px;
+  min-height: 0;
+}
+.slotGrid {
+  display: flex !important;
+  flex-direction: column;
+  gap: 4px;
+}
+.battleCard.empty { display: none !important; }
+
+/* カード本体を横並びに（portrait + meta） */
+.battleCard {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  min-height: 0;
+  padding: 6px 8px;
+  text-align: left;
+}
+.battleCard .cardName {
+  position: absolute;
+  top: 4px; left: 8px;
+  margin: 0;
+  font-size: 10px;
+  z-index: 1;
+}
+.battleCard .cardBody {
+  width: 100%;
+  align-items: center;
+  margin-top: 14px; /* cardNameのスペース確保 */
+}
+.battleCard .cardStats { gap: 1px; }
+
+@media (min-width: 600px) {
+  .battleField { grid-template-columns: 1fr 80px 1fr; padding: 10px; }
+}
+
+/* 陣形ゲージを縦バーから横バーへ。意味を可視化 */
+.battleCenter {
+  display: flex; align-items: center; justify-content: center;
+}
+.formationGauge {
+  flex-direction: column;
+  gap: 4px;
+  width: auto;
+}
+.formGaugeLabel {
+  display: block !important;
+  writing-mode: horizontal-tb;
+  font-size: 10px;
+  color: var(--c-kinari-d);
+  letter-spacing: 1px;
+  text-align: center;
+}
+.formGaugeBar {
+  flex-direction: column;
+  width: 12px;
+  height: 140px;
+  flex: 0 0 auto;
+}
+.formGaugeValues {
+  flex-direction: column;
+  font-size: 9px;
+  text-align: center;
+  align-items: center;
+}
+.formGaugeValues span:first-child { color: var(--f-akatsuki); font-weight: 500; }
+.formGaugeValues span:last-child  { color: var(--c-shu-d); font-weight: 500; }
+.formGaugeValues span::before { color: var(--c-kinari-d); font-size: 8px; margin-right: 2px; }
+.formGaugeValues span:first-child::before { content: '味方'; }
+.formGaugeValues span:last-child::before { content: '敵'; }
+
+/* 戦闘ログのスペース確保 */
+.battleLog {
+  max-height: 64px;
+  font-size: 10px;
+  padding: 2px 8px;
+}
+
+/* 行動ピッカーの safe-area 対応 */
+.actionPicker {
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+.actionRow { gap: 4px; }
+.actionBtn {
+  font-size: 12px;
+  padding: 8px 6px;
+  min-width: 60px;
+}
+
+/* タイトル画面の safe-area */
+.titleScreen { padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) 0; }
+
+/* 配置画面の safe-area */
+.placementScreen { padding-bottom: env(safe-area-inset-bottom); }
+.placementHud { padding-top: max(4px, env(safe-area-inset-top)); }
+
+/* =========================================================================
+   モバイル微調整 v2.1.2
+   - 武将カードの「name absolute」を取り消し、自然なflexレイアウトに戻す
+   - マップエリアを flex column にして、popup を下に静的配置（黒帯解消）
+   - 降伏ボタンに専用クラス
+   ========================================================================= */
+
+/* カードを縦flexに戻し、横並びは内側のcardBodyに任せる */
+.battleCard {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  text-align: left !important;
+  padding: 4px 6px !important;
+  gap: 2px !important;
+}
+.battleCard .cardName {
+  position: static !important;
+  margin: 0 !important;
+  font-size: 10px !important;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.battleCard .cardBody {
+  width: 100%;
+  align-items: center;
+  margin-top: 0 !important;
+  flex: 1;
+  min-height: 0;
+}
+.battleCard .cardStats { gap: 1px; }
+.battleCard .skillRow { display: none; }
+.battleCard .statusRow { min-height: 0; flex-wrap: wrap; }
+.battleCard .hpBar { height: 4px; }
+
+/* マップエリアの黒帯を解消：縦flexで mapArea + popup を縦に並べる */
+@media (max-width: 899px) {
+  .mapArea {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+  }
+  .yashimaMap {
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+  .regionPopup {
+    position: static !important;
+    display: block !important;
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    border: none !important;
+    border-top: 1px solid var(--c-kogane) !important;
+    background: var(--c-sumi-light) !important;
+    pointer-events: auto !important;
+    padding: 8px 12px !important;
+  }
+}
+
+/* 降伏ボタン */
+.battleHud .surrenderBtn {
+  margin-left: auto;
+  padding: 4px 12px;
+  font-size: 11px;
+  background: transparent;
+  border: 1px solid var(--c-kinari-d);
+  border-radius: var(--radius-s);
+  color: var(--c-kinari-d);
+  flex-shrink: 0;
+}
+.battleHud .surrenderBtn:hover { color: var(--c-shu); border-color: var(--c-shu); }
+
+@media (max-width: 480px) {
+  .battleHud { padding-right: 6px; }
+  .battleHud .surrenderBtn { font-size: 10px; padding: 3px 8px; }
+  .battleHud .battleHudGroup.phase { order: 99; flex: 1 1 100%; text-align: center; margin: 0 !important; }
+  /* phaseだけ次行に */
+}
+
+/* 陣形ゲージ：横バーで意味を直感化 */
+.battleCenter {
+  align-items: stretch !important;
+  padding: 0 4px;
+}
+.formationGauge {
+  flex-direction: column !important;
+  gap: 2px !important;
+  width: auto !important;
+  justify-content: center;
+  height: 100%;
+}
+.formGaugeLabel {
+  display: block !important;
+  writing-mode: horizontal-tb !important;
+  font-size: 9px !important;
+  text-align: center;
+  color: var(--c-kinari-d);
+  margin-bottom: 2px;
+}
+.formGaugeBar {
+  width: 14px !important;
+  height: 100% !important;
+  max-height: 60vh;
+  flex: 0 0 auto !important;
+}
+.formGaugeValues {
+  flex-direction: column !important;
+  font-size: 9px !important;
+  text-align: center !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+.formGaugeValues span:first-child::before { content: '味方'; color: var(--c-kinari-d); display: block; font-size: 8px; }
+.formGaugeValues span:last-child::before  { content: '敵';   color: var(--c-shu-d);   display: block; font-size: 8px; }
+.formGaugeValues span:first-child { color: #6FB17C; }
+.formGaugeValues span:last-child { color: var(--c-shu); }

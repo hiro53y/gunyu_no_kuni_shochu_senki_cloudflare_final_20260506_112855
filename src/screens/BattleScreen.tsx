@@ -244,16 +244,7 @@ export function BattleScreen({ state, initialBattle, onComplete }: Props) {
           <span className="value">{phaseLabel}</span>
         </div>
         {!finished && (
-          <button
-            onClick={handleSurrender}
-            style={{
-              marginLeft: 8, padding: '4px 10px',
-              border: '1px solid var(--c-sumi-line)',
-              borderRadius: 'var(--radius-s)',
-              color: 'var(--c-kinari-d)', fontSize: 11,
-              background: 'transparent',
-            }}
-          >
+          <button className="surrenderBtn" onClick={handleSurrender}>
             降伏
           </button>
         )}
