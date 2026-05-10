@@ -34,6 +34,11 @@ const AI_DELAY_MS = 900;
 const TICK_DELAY_MS = 250;
 
 export function BattleScreen({ state, initialBattle, onComplete }: Props) {
+  // 合戦中は battle BGM
+  useEffect(() => {
+    audio.playBgm('battle').catch(() => { /* noop */ });
+  }, []);
+
   const [battle, setBattle] = useState<BattleState>(initialBattle);
   const [activeActor, setActiveActor] = useState<ActorRef | null>(null);
   const [cutIn, setCutIn] = useState<CutInData | null>(null);
@@ -408,7 +413,7 @@ function BattleSummary({ battle, state }: { battle: BattleState; state: GameStat
         ))}
       </div>
       <div style={{ fontSize: 11, color: 'var(--c-kinari-d)', marginTop: 8 }}>
-        ※ 戦果（兵数反映・捕虜化判定・地域支配権）は確定ボタンで適用されます。
+        ※ 戦果（兵数反映・捕虜化判定・地域支配権）は確定ボタ�ンで適用されます。
       </div>
       <span style={{ display: 'none' }}>{state.turn}</span>
     </div>

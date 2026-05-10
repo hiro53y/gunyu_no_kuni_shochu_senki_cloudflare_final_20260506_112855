@@ -4,7 +4,7 @@
 // 設定ダイアログも統合。
 // ===========================================================================
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { GameState, GameConfig } from '../types/game';
 import { hasSave, hasAutoSave, loadGame, loadAutoSave, deleteSave } from '../engine';
 import { createNewGame } from '../createGame';
@@ -21,6 +21,10 @@ export function TitleScreen({ config, onConfigChange, onStartGame }: Props) {
   const [showSettings, setShowSettings] = useState(false);
   const continueAvailable = hasAutoSave();
   const saveAvailable = hasSave();
+
+  useEffect(() => {
+    audio.playBgm('title').catch(() => { /* noop */ });
+  }, []);
 
   function handleNew() {
     audio.play('click');

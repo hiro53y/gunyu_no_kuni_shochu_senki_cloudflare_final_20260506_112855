@@ -4,7 +4,7 @@
 // 合戦コマンドは配置画面 → 合戦画面の順に遷移
 // ===========================================================================
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { BattleState, GameState, General, GeneralId, RegionId, GameConfig } from '../types/game';
 import { Hud } from '../components/Hud';
 import { YashimaMap } from '../components/YashimaMap';
@@ -40,6 +40,13 @@ export function MapScreen({ state, setState, onReturnTitle }: Props) {
   const [detailGeneralId, setDetailGeneralId] = useState<string | null>(null);
   const [activeBattle, setActiveBattle] = useState<BattleState | null>(null);
   const [pendingBattleRegion, setPendingBattleRegion] = useState<RegionId | null>(null);
+
+  // 地図画面に居る間は map BGM を流す
+  useEffect(() => {
+    if (!activeBattle && !pendingBattleRegion) {
+      audio.playBgm('map').catch(() => { /* noop */ });
+    }
+  }, [activeBattle, pendingBattleRegion]);
 
   const flash = useCallback((msg: string) => {
     setNotice(msg);
