@@ -53,7 +53,6 @@ function aggressionScore(faction: Faction): number {
 function tryNpcInvasion(state: GameState, fid: FactionId, rng: Rng): GameState {
   const faction = state.factions[fid];
   if (faction.destroyed) return state;
-  if (!rng.chance(aggressionScore(faction))) return state;
 
   const targets = adjacentEnemyRegions(state, fid);
   if (targets.length === 0) return state;
@@ -77,14 +76,28 @@ function tryNpcInvasion(state: GameState, fid: FactionId, rng: Rng): GameState {
     enemyGeneralIds: fid === 'akatsuki' ? Array(9).fill(null) : attackerIds,
   });
 
-  // プレイヤーが防衛側でない（NPC vs NPC）の場合のみ自動解決
-  if (fid !== 'akatsuki' && defenderFid !== 'akatsuki') {
-    const resolved = autoResolve(battle, state, rng);
-    const fin = finalizeBattle(state, resolved, rng);
-    return fin.state;
-  }
-  // プレイヤー絡みの戦闘は通常 UI から起動するため、ここでは行わない
-  return state;
+  const resolved = autoResolve(battle, state, rng);
+  const fin = finalizeBattle(state, resolved, rng);
+  const invasionLog = [
+    {
+      turn: state.turn,
+      actor: fid,
+      type: 'battle' as const,
+      targetRegionId: target.id,
+      message: `${faction.name}が${target.name}へ侵攻`,
+    },
+    ...fin.log.map((entry) => ({
+      turn: state.turn,
+      actor: fid,
+      type: 'battle' as const,
+      targetRegionId: target.id,
+      message: entry.message,
+    })),
+  ];
+  return {
+    ...fin.state,
+    log: [...invasionLog, ...fin.state.log].slice(0, 80),
+  };
 }
 
 /** NPC が自国地域を建設・補強する */
@@ -135,8 +148,8 @@ export function runNpcTurn(state: GameState, rng: Rng): GameState {
     // 行動回数：性格別 1〜2回
     const acts = f.aiPersonality === 'aggressive' || f.aiPersonality === 'monstrous' ? 2 : 1;
     for (let i = 0; i < acts; i++) {
-      // 30%で侵攻、70%で建設・補強
-      if (rng.chance(0.3)) {
+      // 性格に応じて侵攻。プレイヤー絡みも自動解決し、世界情勢へ反映する。
+      if (rng.chance(aggressionScore(f))) {
         next = tryNpcInvasion(next, fid, rng);
       } else {
         next = tryNpcImprove(next, fid);

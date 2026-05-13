@@ -263,6 +263,42 @@
 .regionPopup .topLine { display: flex; align-items: center; gap: 8px; }
 .regionPopup .name { font-family: var(--font-fude); color: var(--c-kogane); font-size: 16px; letter-spacing: 2px; }
 .regionPopup .faction { font-size: 11px; padding: 1px 6px; border: 1px solid currentColor; border-radius: 2px; }
+.regionInsight {
+  display: grid;
+  gap: 7px;
+  padding: 0 12px 12px;
+  border-top: 1px solid var(--c-sumi-line);
+}
+.regionInsight .insightItem {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 8px;
+  padding-top: 8px;
+}
+.insightLabel,
+.mobileRegionExtra .miniLabel {
+  color: var(--c-kogane);
+  font-size: 10px;
+  font-family: var(--font-fude);
+  letter-spacing: 1px;
+}
+.insightText,
+.mobileRegionExtra .miniText {
+  color: var(--c-kinari);
+  font-size: 11px;
+  line-height: 1.45;
+}
+.mobileRegionExtra {
+  display: none;
+  gap: 6px;
+  border-top: 1px solid var(--c-sumi-line);
+  padding-top: 8px;
+}
+.mobileRegionExtra > div {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 8px;
+}
 
 /* アクションバー */
 .actionBar {
@@ -446,12 +482,12 @@
 }
 .battleCard.active {
   border-color: var(--c-kogane);
-  box-shadow: 0 0 0 2px rgba(201, 162, 74, 0.4), 0 0 12px rgba(201, 162, 74, 0.5);
+  box-shadow: 0 0 0 2px rgba(201, 162, 74, 0.75), 0 0 20px rgba(255, 220, 130, 0.8);
   animation: activePulse 1s ease infinite alternate;
 }
 @keyframes activePulse {
-  from { box-shadow: 0 0 0 2px rgba(201, 162, 74, 0.4), 0 0 12px rgba(201, 162, 74, 0.5); }
-  to   { box-shadow: 0 0 0 2px rgba(255, 220, 130, 0.6), 0 0 18px rgba(255, 220, 130, 0.8); }
+  from { box-shadow: 0 0 0 2px rgba(201, 162, 74, 0.65), 0 0 16px rgba(201, 162, 74, 0.65); }
+  to   { box-shadow: 0 0 0 3px rgba(255, 220, 130, 0.9), 0 0 26px rgba(255, 220, 130, 0.95); }
 }
 .battleCard.targetable {
   border-color: var(--c-shu);
@@ -459,8 +495,8 @@
 }
 .battleCard.targetable:hover { background: rgba(140, 40, 40, 0.2); }
 .battleCard.selectedTarget {
-  border-color: var(--c-shu);
-  box-shadow: 0 0 0 2px rgba(200, 74, 74, 0.5);
+  border-color: #d15cff;
+  box-shadow: 0 0 0 2px rgba(209, 92, 255, 0.72), 0 0 18px rgba(200, 42, 122, 0.75);
 }
 .battleCard.dead { opacity: 0.45; filter: grayscale(0.7); }
 .battleCard:disabled { cursor: default; }
@@ -560,6 +596,19 @@
   transition: height 0.6s ease;
 }
 .formGaugeValues { display: flex; flex-direction: column; gap: 4px; font-size: 9px; color: var(--c-kinari-d); }
+.formGaugeStatus {
+  padding: 2px 5px;
+  border: 1px solid var(--c-sumi-line);
+  border-radius: 2px;
+  font-size: 10px;
+  font-family: var(--font-fude);
+  letter-spacing: 1px;
+  color: var(--c-kinari);
+  white-space: nowrap;
+}
+.formGaugeStatus.ally { color: #8fd59a; border-color: rgba(111, 177, 124, 0.5); }
+.formGaugeStatus.enemy { color: var(--c-shu); border-color: rgba(200, 74, 74, 0.5); }
+.formGaugeStatus.even { color: var(--c-kogane); border-color: rgba(201, 162, 74, 0.5); }
 
 @media (max-width: 600px) {
   .formGaugeBar { width: 4px; height: 120px; }
@@ -616,6 +665,15 @@
 .actionBtn:disabled { opacity: 0.3; }
 .actionName { font-size: 13px; }
 .actionCost { font-size: 9px; color: var(--c-kogane); }
+.actionHelp {
+  display: block;
+  font-family: var(--font-mincho);
+  font-size: 10px;
+  line-height: 1.35;
+  letter-spacing: 0;
+  color: var(--c-kinari-d);
+  max-width: 100%;
+}
 .actionHint {
   font-size: 11px; color: var(--c-shu);
   font-family: var(--font-mincho);
@@ -1082,7 +1140,7 @@
 .placementScreen {
   position: fixed; inset: 0;
   display: grid;
-  grid-template-rows: 48px 1fr auto auto;
+  grid-template-rows: 48px auto 1fr auto auto;
   background:
     radial-gradient(ellipse at 50% 50%, rgba(140, 80, 47, 0.10), transparent 60%),
     var(--c-sumi);
@@ -1103,6 +1161,39 @@
   color: var(--c-kogane); font-family: var(--font-fude);
   letter-spacing: 2px; font-size: 14px;
 }
+
+.placementIntel {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.22);
+  border-bottom: 1px solid var(--c-sumi-line);
+}
+.placementIntel > div {
+  min-width: 0;
+  padding: 7px 8px;
+  background: var(--c-sumi-light);
+  border: 1px solid var(--c-sumi-line);
+  border-radius: var(--radius-s);
+}
+.placementIntel .intelLabel {
+  display: block;
+  color: var(--c-kinari-d);
+  font-size: 10px;
+}
+.placementIntel .intelValue {
+  display: block;
+  color: var(--c-kogane);
+  font-size: 15px;
+  font-family: var(--font-fude);
+  letter-spacing: 1px;
+}
+.forceEval.good { border-color: rgba(111, 177, 124, 0.65); }
+.forceEval.good .intelValue { color: #8fd59a; }
+.forceEval.even { border-color: rgba(201, 162, 74, 0.65); }
+.forceEval.bad { border-color: rgba(200, 74, 74, 0.7); }
+.forceEval.bad .intelValue { color: var(--c-shu); }
 
 .placementBody {
   display: grid;
@@ -1595,3 +1686,190 @@
 .formGaugeValues span:last-child::before  { content: '敵';   color: var(--c-shu-d);   display: block; font-size: 8px; }
 .formGaugeValues span:first-child { color: #6FB17C; }
 .formGaugeValues span:last-child { color: var(--c-shu); }
+
+/* =========================================================================
+   2026-05-13 UI精査: スマホ可読性・合戦説明・バー寸法
+   ========================================================================= */
+
+@media (min-width: 900px) {
+  .battleCard {
+    max-width: 720px;
+  }
+  .playerSide .battleCard { margin-left: auto; }
+  .enemySide .battleCard { margin-right: auto; }
+  .battleCard .hpBar {
+    max-width: 520px;
+  }
+}
+
+@media (max-width: 899px) {
+  .hud {
+    min-height: 50px;
+    padding: 6px 8px;
+    gap: 8px;
+    align-content: center;
+  }
+  .hud .hudGroup .label {
+    display: inline !important;
+    font-size: 10px !important;
+  }
+  .hud .hudGroup .value {
+    font-size: 13px !important;
+    line-height: 1.15;
+  }
+  .hud .hudGroup.turn .value {
+    font-size: 16px !important;
+  }
+  .hud .hudGroup .value::before {
+    content: none !important;
+  }
+  .hud .hudGroup.ap .dot {
+    width: 10px;
+    height: 10px;
+  }
+
+  .regionPopup {
+    max-height: 34vh;
+    overflow-y: auto;
+    gap: 8px !important;
+    font-size: 13px !important;
+  }
+  .regionPopup .name {
+    font-size: 18px;
+  }
+  .regionPopup .regionInsight {
+    padding: 0;
+    border-top: 1px solid var(--c-sumi-line);
+  }
+  .regionPopup .regionInsight .insightItem {
+    grid-template-columns: 70px 1fr;
+    padding-top: 7px;
+  }
+  .regionPopup .insightLabel,
+  .mobileRegionExtra .miniLabel {
+    font-size: 11px;
+  }
+  .regionPopup .insightText,
+  .mobileRegionExtra .miniText {
+    font-size: 12px;
+  }
+  .mobileRegionExtra {
+    display: grid;
+  }
+
+  .actionBar button {
+    min-height: 52px;
+    font-size: 12px !important;
+    letter-spacing: 1px;
+  }
+  .actionBar button .actIcon {
+    font-size: 18px;
+  }
+
+  .placementHud {
+    min-height: 54px;
+    font-size: 13px;
+  }
+  .placementHudGroup .label {
+    font-size: 11px;
+  }
+  .placementHudGroup .value {
+    font-size: 15px;
+  }
+  .placementIntel {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 5px;
+    padding: 7px 8px;
+  }
+  .placementIntel > div {
+    padding: 6px;
+  }
+  .placementIntel .intelLabel {
+    font-size: 10px;
+  }
+  .placementIntel .intelValue {
+    font-size: 14px;
+  }
+  .placementSlot .slotName,
+  .rosterName,
+  .enemyPreviewRow div {
+    font-size: 13px !important;
+  }
+  .placementSlot .slotStats,
+  .rosterStats,
+  .rosterTroops,
+  .enemyPreviewRow small {
+    font-size: 11px !important;
+  }
+
+  .battleHud {
+    font-size: 12px;
+    min-height: 54px;
+  }
+  .battleHud .battleHudGroup .label {
+    display: inline;
+    font-size: 10px;
+  }
+  .battleHud .battleHudGroup .value {
+    font-size: 13px;
+  }
+  .battleHud .battleHudGroup.phase .value {
+    font-size: 15px;
+  }
+  .battleField {
+    gap: 5px;
+    padding: 6px;
+  }
+  .battleCard {
+    min-height: 76px;
+    padding: 6px !important;
+  }
+  .battleCard .cardName {
+    font-size: 12px !important;
+  }
+  .hpRow {
+    font-size: 12px;
+  }
+  .hpRow .hpSlash,
+  .hpRow .hpMax,
+  .cardMeta {
+    font-size: 10px;
+  }
+  .battleCard .hpBar {
+    height: 5px !important;
+    max-width: 100%;
+  }
+  .battleLog {
+    max-height: 94px;
+    font-size: 12px !important;
+    line-height: 1.45;
+    padding: 5px 9px;
+  }
+  .formGaugeLabel {
+    font-size: 10px !important;
+    color: var(--c-kogane);
+  }
+  .formGaugeStatus {
+    font-size: 10px;
+    padding: 2px 4px;
+  }
+  .actionPicker {
+    gap: 7px;
+  }
+  .actionLabel {
+    font-size: 14px;
+  }
+  .actionBtn {
+    min-width: min(100%, 104px);
+    padding: 8px 6px;
+  }
+  .actionName {
+    font-size: 14px;
+  }
+  .actionCost {
+    font-size: 11px;
+  }
+  .actionHelp {
+    font-size: 11px;
+  }
+}

@@ -116,3 +116,19 @@ OneDrive の同期保護で `rm` できなかったため、`echo > file` で内
 - OneDrive 同期：`rm` `mv` がしばしば EPERM。ファイル内容の上書きは `cat > file` で問題ない。
 - TypeScript の `as const` をリテラル配列で使う／関数引数を明示的に型付けすることで `rng.weighted` の戻り型が string に推論される問題を回避できる。
 - `strict: true` 環境のため、`exactOptionalPropertyTypes` 周りは要注意。
+
+---
+
+## 2026-05-13 追加改修メモ
+
+- スマホ地図の下部パネルに、地形効果、月次収入見込み、満足度の意味、直近作戦記、所属武将の簡易表示を追加。
+- 出陣画面に味方総兵力、敵総兵力、戦力評価（有利/互角/不利）を追加。
+- 合戦画面の中央表示を「戦況ゲージ」に変更し、味方優勢/互角/敵優勢を表示。手番武将は金色発光、攻撃対象は赤紫枠で強調。
+- 合戦の行動ボタンに気力消費、対象種別、予測ダメージまたは効果説明を表示。
+- NPCターンでプレイヤー絡みの侵攻を破棄していた不具合を修正。自動解決し、作戦記に侵攻ログを残す。
+- `tests/gameEngine.test.ts` は旧v1 API参照をやめ、現行v2.1 APIに更新済み。
+
+### 追加検証
+- `npm test` → 9件通過
+- `npx tsc -b --pretty false` → エラーなし
+- `npm run build` → TypeScript は通過するが、このCodex/OneDrive環境では Vite/esbuild の実行ファイル起動が `spawn EPERM` で停止。コード起因の型エラーではないため、Cloudflare Pages または通常PC環境で再確認する。

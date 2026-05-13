@@ -6,6 +6,7 @@
 import { useMemo, useState } from 'react';
 import type { GameState, GeneralId, RegionId, FactionId } from '../types/game';
 import { GeneralPortrait } from '../components/GeneralPortrait';
+import { TERRAIN_BONUSES } from '../data/regions';
 import { audio } from '../audio/AudioManager';
 
 interface Props {
@@ -21,6 +22,10 @@ const FACTION_NAME: Record<FactionId, string> = {
 };
 
 const ROW_LABELS = ['前列', '中列', '後列'];
+
+function forceValue(g: { stats: { power: number; command: number }; troopCurrent: number }): number {
+  return Math.round(g.troopCurrent * (1 + (g.stats.power + g.stats.command) / 220));
+}
 
 export function BattlePlacementScreen({ state, regionId, onConfirm, onCancel }: Props) {
   // 配置スロット：[front, middle, back]
@@ -109,6 +114,17 @@ export function BattlePlacementScreen({ state, regionId, onConfirm, onCancel }: 
   }
 
   const placedCount = slots.filter(Boolean).length;
+  const placedGenerals = slots
+    .map((id) => (id ? state.generals[id] : null))
+    .filter((g): g is NonNullable<typeof g> => Boolean(g));
+  const allyTroops = placedGenerals.reduce((sum, g) => sum + g.troopCurrent, 0);
+  const enemyTroops = enemyPreview.reduce((sum, g) => sum + g.troopCurrent, 0);
+  const allyForce = placedGenerals.reduce((sum, g) => sum + forceValue(g), 0);
+  const enemyForce = enemyPreview.reduce((sum, g) => sum + forceValue(g), 0);
+  const forceRatio = enemyForce > 0 ? allyForce / enemyForce : 2;
+  const forceLabel = forceRatio >= 1.18 ? '有利' : forceRatio <= 0.88 ? '不利' : '互角';
+  const forceClass = forceRatio >= 1.18 ? 'good' : forceRatio <= 0.88 ? 'bad' : 'even';
+  const terrainNote = region ? TERRAIN_BONUSES[region.terrain]?.note : '';
 
   return (
     <div className="placementScreen">
@@ -124,11 +140,25 @@ export function BattlePlacementScreen({ state, regionId, onConfirm, onCancel }: 
         <div className="placementHudGroup">
           <span className="label">地形</span>
           <span className="value" style={{ fontSize: 12 }}>
-            {/* 戦場補正のメモ */}
-            {(region?.terrain ?? '')}
+            {terrainNote || region?.terrain || ''}
           </span>
         </div>
       </header>
+
+      <section className="placementIntel">
+        <div>
+          <span className="intelLabel">味方総兵力</span>
+          <span className="intelValue">{allyTroops.toLocaleString()}</span>
+        </div>
+        <div>
+          <span className="intelLabel">敵総兵力</span>
+          <span className="intelValue">{enemyTroops.toLocaleString()}</span>
+        </div>
+        <div className={`forceEval ${forceClass}`}>
+          <span className="intelLabel">戦力評価</span>
+          <span className="intelValue">{forceLabel}</span>
+        </div>
+      </section>
 
       <div className="placementBody">
         {/* プレイヤー配置 */}

@@ -141,18 +141,58 @@ export function BattleScreen({ state, initialBattle, onComplete }: Props) {
     return getDefaultPlayerActions(g);
   }, [activeActor, battle, state]);
 
+  const activePlayerGeneral = useMemo(() => {
+    if (!activeActor || activeActor.side !== 'player') return null;
+    const slot = battle.playerSlots[activeActor.index];
+    return slot.generalId ? state.generals[slot.generalId] : null;
+  }, [activeActor, battle.playerSlots, state.generals]);
+
+  function describeAction(skillId: string): string {
+    const skill = getSkill(skillId);
+    if (!activePlayerGeneral) return skill.description;
+
+    if ((skill.kind === 'attack' || skill.kind === 'aoe' || skill.kind === 'special') && skill.effect.basePower > 0) {
+      const targetSlot = selectedTarget !== null
+        ? battle.enemySlots[selectedTarget]
+        : battle.enemySlots.find((s) => s.generalId && !s.retreated && s.hp > 0);
+      const targetGeneral = targetSlot?.generalId ? state.generals[targetSlot.generalId] : null;
+      if (targetSlot && targetGeneral) {
+        const raw = (activePlayerGeneral.stats.power * 6 - targetGeneral.stats.command * 3) * skill.effect.basePower;
+        const floor = targetSlot.hpMax * 0.02;
+        const terrain = 1 + battle.terrainBonus.atkPct / 100;
+        const estimate = Math.max(1, Math.round(Math.max(raw, floor) * terrain));
+        const min = Math.max(1, Math.round(estimate * 0.9));
+        const max = Math.max(min, Math.round(estimate * 1.1));
+        const scope = skill.target === 'enemy_all' ? '全体' : '単体';
+        const cost = skill.cost > 0 ? `気${skill.cost}` : '気力消費なし';
+        return `${scope}攻撃、${cost}、予測${min}〜${max}`;
+      }
+    }
+
+    if (skill.kind === 'support') {
+      const cost = skill.cost > 0 ? `気${skill.cost}` : '気力消費なし';
+      return `${cost}、${skill.description}`;
+    }
+    if (skill.kind === 'heal') {
+      const scope = skill.target === 'ally_all' ? '味方全体' : '味方単体';
+      return `${scope}回復、気${skill.cost}、${skill.description}`;
+    }
+    return skill.description;
+  }
+
   function executePlayerSkill(skillId: string, targetIndex: number | null) {
     if (!activeActor) return;
     const slot = battle.playerSlots[activeActor.index];
     const g = slot.generalId ? state.generals[slot.generalId] : null;
     const skill = getSkill(skillId);
     setPendingSkillId(null);
-    setSelectedTarget(null);
+    if (targetIndex !== null) setSelectedTarget(targetIndex);
 
     const proceed = () => {
       const after = playerExecuteAction(battle, state, activeActor, skillId, targetIndex, rngRef.current);
       setBattle(after);
       setActiveActor(null);
+      window.setTimeout(() => setSelectedTarget(null), 450);
     };
 
     if (g && skill.cutInDialogue) {
@@ -325,6 +365,7 @@ export function BattleScreen({ state, initialBattle, onComplete }: Props) {
               >
                 <span className="actionName">{a.name}</span>
                 {a.cost > 0 && <span className="actionCost">気{a.cost}</span>}
+                <span className="actionHelp">{describeAction(a.id)}</span>
               </button>
             ))}
           </div>
@@ -386,10 +427,14 @@ function FormationGauge({ battle }: { battle: BattleState }) {
   const enemyHp  = battle.enemySlots.reduce((s, x) => s + x.hp, 0);
   const total = playerHp + enemyHp || 1;
   const playerPct = (playerHp / total) * 100;
+  const status = playerPct >= 56 ? '味方優勢' : playerPct <= 44 ? '敵優勢' : '互角';
 
   return (
-    <div className="formationGauge" role="img" aria-label="陣形ゲージ">
-      <div className="formGaugeLabel">陣形</div>
+    <div className="formationGauge" role="img" aria-label={`戦況ゲージ ${status}`}>
+      <div className="formGaugeLabel">戦況ゲージ</div>
+      <div className={`formGaugeStatus ${playerPct >= 56 ? 'ally' : playerPct <= 44 ? 'enemy' : 'even'}`}>
+        {status}
+      </div>
       <div className="formGaugeBar">
         <div className="formGaugePlayer" style={{ height: `${playerPct}%` }} />
         <div className="formGaugeEnemy"  style={{ height: `${100 - playerPct}%` }} />
@@ -413,7 +458,7 @@ function BattleSummary({ battle, state }: { battle: BattleState; state: GameStat
         ))}
       </div>
       <div style={{ fontSize: 11, color: 'var(--c-kinari-d)', marginTop: 8 }}>
-        ※ 戦果（兵数反映・捕虜化判定・地域支配権）は確定ボタ�ンで適用されます。
+        ※ 戦果（兵数反映・捕虜化判定・地域支配権）は確定ボタ�ンで適用されます。
       </div>
       <span style={{ display: 'none' }}>{state.turn}</span>
     </div>

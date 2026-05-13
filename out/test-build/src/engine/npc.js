@@ -1,172 +1,154 @@
 "use strict";
+// ===========================================================================
+// NPC勢力AI v2.1
+// ターン終了時に各NPC勢力の行動を決定し適用する。
+// 現状は意思決定の枠組みを実装し、合戦・建設・徴兵を中心に処理する。
+// ===========================================================================
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.runNpcTurn = runNpcTurn;
-const names_1 = require("../data/names");
 const battle_1 = require("./battle");
-const economy_1 = require("./economy");
-const log_1 = require("./log");
-const random_1 = require("./random");
-const selectors_1 = require("./selectors");
-function invasionThreshold(state, faction, target) {
-    const base = {
-        aggressive: 0.82,
-        opportunist: 0.76,
-        balanced: 0.94,
-        domestic: 1.12,
-    }[faction.aiPersonality];
-    const difficultyShift = state.difficulty === 'hard' ? -0.08 : state.difficulty === 'easy' ? 0.12 : 0;
-    const playerPressure = target.ownerFactionId === names_1.PLAYER_FACTION_ID && (0, selectors_1.getPlayerRegions)(state).length >= 5 ? -0.06 : 0;
-    return base + difficultyShift + playerPressure;
+/** NPC勢力が支配する地域を返す */
+function ownRegions(state, fid) {
+    return Object.values(state.regions).filter((r) => r.factionId === fid);
 }
-function estimateAttackerPower(officers, faction) {
-    return officers.reduce((sum, officer) => {
-        const stamina = officer.stamina >= 45 ? 1 : 0.82;
-        return sum + officer.troops * (0.7 + officer.command / 120) * (0.8 + officer.valor / 180) * stamina;
-    }, 0) * (0.82 + faction.morale / 150);
-}
-function chooseAttackers(state, factionId) {
-    return (0, selectors_1.getFactionOfficers)(state, factionId)
-        .filter((officer) => officer.troops >= 80 && officer.stamina >= 25)
-        .sort((a, b) => b.command + b.valor + b.troops / 20 - (a.command + a.valor + a.troops / 20))
-        .slice(0, 3);
-}
-function runNpcInvasion(state, faction) {
-    const attackers = chooseAttackers(state, faction.id);
-    if (attackers.length === 0 || faction.food < 45) {
-        return null;
+/** 隣接する敵地域を返す */
+function adjacentEnemyRegions(state, fid) {
+    const own = ownRegions(state, fid);
+    const set = new Set();
+    for (const r of own) {
+        for (const adj of r.adjacentIds) {
+            const ar = state.regions[adj];
+            if (ar && ar.factionId !== fid && ar.factionId !== null)
+                set.add(adj);
+        }
     }
-    const attackPower = estimateAttackerPower(attackers, faction);
-    const candidates = (0, selectors_1.getAdjacentEnemyRegions)(state, faction.id)
-        .map((region) => ({
-        region,
-        ratio: attackPower / Math.max(1, (0, selectors_1.estimateRegionDefense)(state, region.id)),
-    }))
-        .sort((a, b) => b.ratio - a.ratio);
-    const target = candidates.find((candidate) => candidate.ratio >= invasionThreshold(state, faction, candidate.region));
-    if (!target) {
-        return null;
+    return [...set].map((id) => state.regions[id]).filter((r) => Boolean(r));
+}
+/** 自勢力の合戦員候補（兵数が一定以上の武将） */
+function combatRoster(state, fid, max = 3) {
+    return Object.values(state.generals)
+        .filter((g) => g.factionId === fid && (g.status === 'free' || g.status === 'recruited'))
+        .filter((g) => g.troopCurrent >= 100)
+        .sort((a, b) => (b.stats.power + b.stats.command) - (a.stats.power + a.stats.command))
+        .slice(0, max)
+        .map((g) => g.id);
+}
+/** 侵攻判断のしきい値（性格別） */
+function aggressionScore(faction) {
+    switch (faction.aiPersonality) {
+        case 'aggressive': return 0.85;
+        case 'monstrous': return 0.95;
+        case 'mercenary': return 0.30;
+        case 'economic': return 0.40;
+        case 'religious': return 0.55;
+        case 'defensive': return 0.45;
+        default: return 0.50;
     }
-    const beforeOwner = state.factions[target.region.ownerFactionId]?.name ?? '不明勢力';
-    let next = {
-        ...state,
-        factions: {
-            ...state.factions,
-            [faction.id]: { ...faction, food: Math.max(0, faction.food - 45) },
-        },
-    };
-    next = (0, battle_1.resolveBattle)(next, {
-        attackerFactionId: faction.id,
-        targetRegionId: target.region.id,
-        attackerOfficerIds: attackers.map((officer) => officer.id),
+}
+/** NPC が侵攻先を選択して合戦を実行する */
+function tryNpcInvasion(state, fid, rng) {
+    const faction = state.factions[fid];
+    if (faction.destroyed)
+        return state;
+    const targets = adjacentEnemyRegions(state, fid);
+    if (targets.length === 0)
+        return state;
+    // 国力の低い地域を優先
+    const target = targets.sort((a, b) => a.power - b.power)[0];
+    const attackerIds = combatRoster(state, fid, 3);
+    if (attackerIds.length === 0)
+        return state;
+    const defenderFid = target.factionId;
+    if (!defenderFid)
+        return state;
+    const defenderIds = combatRoster(state, defenderFid, 3);
+    const battle = (0, battle_1.initBattle)(state, {
+        regionId: target.id,
+        playerIsAttacker: false,
+        attackerFactionId: fid,
+        defenderFactionId: defenderFid,
+        playerGeneralIds: defenderFid === 'akatsuki' ? defenderIds : Array(9).fill(null),
+        enemyGeneralIds: fid === 'akatsuki' ? Array(9).fill(null) : attackerIds,
     });
-    const result = next.lastBattleResult;
-    const message = result?.conquered === true
-        ? `${faction.name}が${beforeOwner}の${target.region.name}を制圧した。`
-        : `${faction.name}が${target.region.name}へ攻め込んだが、城を落とせなかった。`;
-    return (0, log_1.addLog)(next, 'battle', message);
+    const resolved = (0, battle_1.autoResolve)(battle, state, rng);
+    const fin = (0, battle_1.finalizeBattle)(state, resolved, rng);
+    const invasionLog = [
+        {
+            turn: state.turn,
+            actor: fid,
+            type: 'battle',
+            targetRegionId: target.id,
+            message: `${faction.name}が${target.name}へ侵攻`,
+        },
+        ...fin.log.map((entry) => ({
+            turn: state.turn,
+            actor: fid,
+            type: 'battle',
+            targetRegionId: target.id,
+            message: entry.message,
+        })),
+    ];
+    return {
+        ...fin.state,
+        log: [...invasionLog, ...fin.state.log].slice(0, 80),
+    };
 }
-function runNpcRecruit(state, faction) {
-    if (faction.gold < 36 || faction.food < 40) {
-        return null;
-    }
-    const ownRegions = (0, selectors_1.getFactionRegions)(state, faction.id);
-    if (ownRegions.length === 0) {
-        return null;
-    }
-    const target = [...ownRegions].sort((a, b) => a.localTroops + a.castleHp * 3 - (b.localTroops + b.castleHp * 3))[0];
-    const recruitAmount = state.difficulty === 'hard' ? 135 : state.difficulty === 'easy' ? 90 : 110;
+/** NPC が自国地域を建設・補強する */
+function tryNpcImprove(state, fid) {
+    const own = ownRegions(state, fid);
+    if (own.length === 0)
+        return state;
+    // 国力が低い地域を1つ強化
+    const target = own.sort((a, b) => a.power - b.power)[0];
     return {
         ...state,
         regions: {
             ...state.regions,
             [target.id]: {
                 ...target,
-                localTroops: target.localTroops + recruitAmount,
-                publicOrder: Math.max(25, target.publicOrder - 2),
-            },
-        },
-        factions: {
-            ...state.factions,
-            [faction.id]: {
-                ...faction,
-                gold: faction.gold - 36,
-                food: faction.food - 40,
+                power: Math.min(10, target.power + 1),
+                satisfaction: Math.min(100, target.satisfaction + 3),
             },
         },
     };
 }
-function runNpcDomestic(state, faction) {
-    const ownRegions = (0, selectors_1.getFactionRegions)(state, faction.id);
-    if (ownRegions.length === 0) {
-        return null;
-    }
-    const target = [...ownRegions].sort((a, b) => {
-        const aNeed = (a.maxCastleHp - a.castleHp) * 1.1 + (100 - a.publicOrder) + (8 - a.developmentLevel) * 4;
-        const bNeed = (b.maxCastleHp - b.castleHp) * 1.1 + (100 - b.publicOrder) + (8 - b.developmentLevel) * 4;
-        return bNeed - aNeed;
-    })[0];
-    const repaired = target.castleHp < target.maxCastleHp;
-    return {
-        ...state,
-        regions: {
-            ...state.regions,
-            [target.id]: repaired
-                ? { ...target, castleHp: Math.min(target.maxCastleHp, target.castleHp + 18), publicOrder: Math.min(100, target.publicOrder + 2) }
-                : {
-                    ...target,
-                    riceYield: Math.min(150, target.riceYield + 5),
-                    publicOrder: Math.min(100, target.publicOrder + 3),
-                    developmentLevel: Math.min(8, target.developmentLevel + (target.developmentLevel < 5 ? 1 : 0)),
-                },
-        },
-    };
-}
-function runNpcAction(state, faction) {
-    const ownRegions = (0, selectors_1.getFactionRegions)(state, faction.id);
-    if (ownRegions.length === 0) {
+/** 妖魔勢力の特殊成長（ターン経過で強化） */
+function applyYoumaGrowth(state, rng) {
+    if (state.turn < 30)
         return state;
-    }
-    const lowFood = faction.food < ownRegions.length * 95;
-    const weakestCastle = ownRegions.some((region) => region.castleHp < region.maxCastleHp * 0.45);
-    const shouldDefend = ownRegions.length <= 1 || lowFood || weakestCastle;
-    const aggression = {
-        aggressive: 0.7,
-        opportunist: 0.58,
-        balanced: 0.46,
-        domestic: 0.28,
-    }[faction.aiPersonality];
-    const attackBias = (0, random_1.clamp)(aggression + ((0, selectors_1.getPlayerRegions)(state).length >= 6 ? 0.08 : 0), 0.2, 0.78);
-    if (!shouldDefend) {
-        const attack = runNpcInvasion(state, faction);
-        if (attack && attack.lastBattleResult?.conquered) {
-            return attack;
-        }
-        if (attack && attack.lastBattleResult && attackBias >= 0.55) {
-            return attack;
+    // 30ターン以降、妖魔の地域の国力を上げる
+    const next = { ...state, regions: { ...state.regions } };
+    for (const r of Object.values(state.regions)) {
+        if (r.factionId === 'youma') {
+            next.regions[r.id] = { ...r, power: Math.min(10, r.power + (rng.chance(0.4) ? 1 : 0)) };
         }
     }
-    const recruit = runNpcRecruit(state, state.factions[faction.id]);
-    if (recruit && (shouldDefend || faction.aiPersonality !== 'domestic')) {
-        return recruit;
-    }
-    return runNpcDomestic(state, state.factions[faction.id]) ?? state;
+    return next;
 }
-function runNpcTurn(state) {
+/** 全 NPC 勢力のターン処理を実行 */
+function runNpcTurn(state, rng) {
     let next = state;
-    const npcFactions = Object.values(next.factions).filter((faction) => faction.isMajor && !faction.isPlayer);
-    npcFactions.forEach((faction) => {
-        if (next.gameStatus !== 'playing') {
-            return;
+    const npcIds = ['kurogane', 'shion', 'shirasagi', 'honoo', 'rengein', 'youma', 'ronin'];
+    for (const fid of npcIds) {
+        const f = next.factions[fid];
+        if (!f || f.destroyed)
+            continue;
+        if (ownRegions(next, fid).length === 0) {
+            next = { ...next, factions: { ...next.factions, [fid]: { ...f, destroyed: true } } };
+            continue;
         }
-        if ((0, selectors_1.getFactionRegions)(next, faction.id).length === 0) {
-            return;
+        // 行動回数：性格別 1〜2回
+        const acts = f.aiPersonality === 'aggressive' || f.aiPersonality === 'monstrous' ? 2 : 1;
+        for (let i = 0; i < acts; i++) {
+            // 性格に応じて侵攻。プレイヤー絡みも自動解決し、世界情勢へ反映する。
+            if (rng.chance(aggressionScore(f))) {
+                next = tryNpcInvasion(next, fid, rng);
+            }
+            else {
+                next = tryNpcImprove(next, fid);
+            }
         }
-        next = (0, economy_1.applyFactionIncome)(next, faction.id);
-        next = (0, economy_1.applyRegionAttrition)(next, faction.id);
-        const actionCount = faction.aiPersonality === 'aggressive' && next.difficulty !== 'easy' ? 2 : 1;
-        for (let index = 0; index < actionCount; index += 1) {
-            next = runNpcAction(next, next.factions[faction.id]);
-        }
-    });
+    }
+    next = applyYoumaGrowth(next, rng);
     return next;
 }

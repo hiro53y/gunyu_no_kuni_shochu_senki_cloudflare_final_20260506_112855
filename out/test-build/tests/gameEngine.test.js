@@ -4,12 +4,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const strict_1 = __importDefault(require("node:assert/strict"));
-const initialGameData_1 = require("../src/data/initialGameData");
-const names_1 = require("../src/data/names");
-const actions_1 = require("../src/engine/actions");
+const createGame_1 = require("../src/createGame");
 const battle_1 = require("../src/engine/battle");
+const economy_1 = require("../src/engine/economy");
+const npc_1 = require("../src/engine/npc");
+const rng_1 = require("../src/engine/rng");
 const save_1 = require("../src/engine/save");
-const victory_1 = require("../src/engine/victory");
 const results = [];
 function test(name, fn) {
     try {
@@ -21,164 +21,91 @@ function test(name, fn) {
         throw error;
     }
 }
+function eagerRng() {
+    return {
+        next: () => 0,
+        int: (min) => min,
+        pick: (arr) => arr[0],
+        chance: () => true,
+        weighted: (items) => items[0],
+        getSeed: () => 1,
+    };
+}
 function report() {
     results.forEach((line) => console.log(line));
     console.log(`${results.length} tests passed`);
 }
 function run() {
-    test('戦闘計算が結果を返す', () => {
-        const state = (0, initialGameData_1.createInitialGameState)('normal');
-        const resultState = (0, battle_1.resolveBattle)(state, {
-            attackerFactionId: names_1.PLAYER_FACTION_ID,
-            targetRegionId: 'r_shiramine',
-            attackerOfficerIds: ['o_harutsuna', 'o_saku'],
+    test('新規ゲームが現行データで作成できる', () => {
+        const state = (0, createGame_1.createNewGame)(1234);
+        strict_1.default.equal(state.turn, 1);
+        strict_1.default.equal(Object.keys(state.regions).length, 15);
+        strict_1.default.ok(Object.keys(state.generals).length >= 20);
+        strict_1.default.equal(state.regions['01'].factionId, 'akatsuki');
+    });
+    test('建設で地域が強化され金を消費する', () => {
+        const state = (0, createGame_1.createNewGame)(1234);
+        const beforeGold = state.factions.akatsuki.treasury;
+        const beforeFarm = state.regions['01'].buildLevels.farm;
+        const outcome = (0, economy_1.applyBuildAction)(state, '01', 'farm');
+        strict_1.default.equal(outcome.ok, true);
+        strict_1.default.equal(outcome.state.regions['01'].buildLevels.farm, beforeFarm + 1);
+        strict_1.default.ok(outcome.state.factions.akatsuki.treasury < beforeGold);
+    });
+    test('徴収で金が増え満足度が下がる', () => {
+        const state = (0, createGame_1.createNewGame)(1234);
+        const beforeGold = state.factions.akatsuki.treasury;
+        const beforeSatisfaction = state.regions['01'].satisfaction;
+        const outcome = (0, economy_1.applyCollectAction)(state, '01');
+        strict_1.default.equal(outcome.ok, true);
+        strict_1.default.ok(outcome.state.factions.akatsuki.treasury > beforeGold);
+        strict_1.default.ok(outcome.state.regions['01'].satisfaction < beforeSatisfaction);
+    });
+    test('合戦を自動解決して戦後処理まで進められる', () => {
+        const state = (0, createGame_1.createNewGame)(1234);
+        const battle = (0, battle_1.initBattle)(state, {
+            regionId: '06',
+            playerIsAttacker: true,
+            attackerFactionId: 'akatsuki',
+            defenderFactionId: 'shion',
+            playerGeneralIds: ['g_kazama_saku', 'g_suzuran', 'g_asagiri_chikage', null, null, null, null, null, null],
+            enemyGeneralIds: ['g_shionin_hazuki', 'g_shionin_fuuko', 'g_narumi_souji', null, null, null, null, null, null],
         });
-        strict_1.default.notEqual(resultState.lastBattleResult, null);
-        strict_1.default.equal(resultState.stats.totalBattles, 1);
+        const resolved = (0, battle_1.autoResolve)(battle, state, (0, rng_1.createRng)(99));
+        const finalized = (0, battle_1.finalizeBattle)(state, resolved, (0, rng_1.createRng)(100));
+        strict_1.default.notEqual(resolved.result, 'in_progress');
+        strict_1.default.equal(finalized.state.battleState, null);
+        strict_1.default.ok(finalized.log.length > 0);
     });
-    test('内政で石高が増える', () => {
-        const state = (0, initialGameData_1.createInitialGameState)('normal');
-        const before = state.regions.r_akihara.riceYield;
-        const outcome = (0, actions_1.performDomestic)(state, 'riceYield');
-        strict_1.default.equal(outcome.ok, true);
-        strict_1.default.ok(outcome.state.regions.r_akihara.riceYield > before);
-        strict_1.default.equal(outcome.state.actionPoints, 2);
+    test('NPC侵攻がプレイヤー絡みでも作戦記へ反映される', () => {
+        const state = (0, createGame_1.createNewGame)(1234);
+        const next = (0, npc_1.runNpcTurn)(state, eagerRng());
+        strict_1.default.ok(next.log.some((entry) => entry.type === 'battle'));
+        strict_1.default.ok(next.log.some((entry) => entry.message.includes('侵攻')));
     });
-    test('徴兵で兵力が増え、資源が減る', () => {
-        const state = (0, initialGameData_1.createInitialGameState)('normal');
-        const beforeTroops = state.regions.r_akihara.localTroops;
-        const beforeGold = state.factions[names_1.PLAYER_FACTION_ID].gold;
-        const outcome = (0, actions_1.performRecruitTroops)(state);
-        strict_1.default.equal(outcome.ok, true);
-        strict_1.default.ok(outcome.state.regions.r_akihara.localTroops > beforeTroops);
-        strict_1.default.ok(outcome.state.factions[names_1.PLAYER_FACTION_ID].gold < beforeGold);
-    });
-    test('進軍勝利時に地域支配が変わる', () => {
-        const state = (0, initialGameData_1.createInitialGameState)('easy');
-        const boosted = {
-            ...state,
-            selectedRegionId: 'r_shiramine',
-            officers: {
-                ...state.officers,
-                o_harutsuna: { ...state.officers.o_harutsuna, troops: 900, command: 96, valor: 90 },
-                o_saku: { ...state.officers.o_saku, troops: 760, command: 88, valor: 94 },
-            },
-            regions: {
-                ...state.regions,
-                r_shiramine: { ...state.regions.r_shiramine, castleHp: 1, localTroops: 60 },
-            },
-        };
-        const resultState = (0, battle_1.resolveBattle)(boosted, {
-            attackerFactionId: names_1.PLAYER_FACTION_ID,
-            targetRegionId: 'r_shiramine',
-            attackerOfficerIds: ['o_harutsuna', 'o_saku'],
-        });
-        strict_1.default.equal(resultState.lastBattleResult?.conquered, true);
-        strict_1.default.equal(resultState.regions.r_shiramine.ownerFactionId, names_1.PLAYER_FACTION_ID);
-        strict_1.default.notEqual(resultState.officers.o_mayuki.locationRegionId, 'r_shiramine');
-    });
-    test('戦闘経験値は100未満に正規化されレベルアップする', () => {
-        const state = (0, initialGameData_1.createInitialGameState)('easy');
-        const prepared = {
-            ...state,
-            officers: {
-                ...state.officers,
-                o_harutsuna: { ...state.officers.o_harutsuna, exp: 95, troops: 900, command: 96, valor: 90 },
-            },
-            regions: {
-                ...state.regions,
-                r_shiramine: { ...state.regions.r_shiramine, castleHp: 1, localTroops: 60 },
-            },
-        };
-        const resultState = (0, battle_1.resolveBattle)(prepared, {
-            attackerFactionId: names_1.PLAYER_FACTION_ID,
-            targetRegionId: 'r_shiramine',
-            attackerOfficerIds: ['o_harutsuna'],
-        });
-        strict_1.default.ok(resultState.officers.o_harutsuna.exp < 100);
-        strict_1.default.ok(resultState.officers.o_harutsuna.level > state.officers.o_harutsuna.level);
-    });
-    test('訓練レベルアップ後の新しい兵数上限を使う', () => {
-        const state = (0, initialGameData_1.createInitialGameState)('normal');
-        const prepared = {
-            ...state,
-            selectedOfficerIds: ['o_harutsuna'],
-            officers: {
-                ...state.officers,
-                o_harutsuna: { ...state.officers.o_harutsuna, exp: 94, troops: 510, maxTroops: 520, command: 96 },
-            },
-        };
-        const outcome = (0, actions_1.performTrain)(prepared);
-        strict_1.default.equal(outcome.ok, true);
-        strict_1.default.ok(outcome.state.officers.o_harutsuna.maxTroops > 520);
-        strict_1.default.ok(outcome.state.officers.o_harutsuna.troops > 520);
-    });
-    test('休養で負傷武将が復帰する', () => {
-        const state = (0, initialGameData_1.createInitialGameState)('normal');
-        const prepared = {
-            ...state,
-            selectedOfficerIds: ['o_saku'],
-            officers: {
-                ...state.officers,
-                o_saku: { ...state.officers.o_saku, status: 'wounded', troops: 0, stamina: 5 },
-            },
-        };
-        const outcome = (0, actions_1.performRest)(prepared);
-        strict_1.default.equal(outcome.ok, true);
-        strict_1.default.equal(outcome.state.officers.o_saku.status, 'active');
-        strict_1.default.ok(outcome.state.officers.o_saku.stamina >= 28);
-        strict_1.default.equal(outcome.state.actionPoints, 2);
-    });
-    test('登用はAPを消費し候補所在地に配置する', () => {
-        const state = (0, initialGameData_1.createInitialGameState)('normal');
-        const prepared = {
-            ...state,
-            rngSeed: 1,
-            selectedRegionId: 'r_kurose',
-            officers: {
-                ...state.officers,
-                o_gento: { ...state.officers.o_gento, status: 'available', locationRegionId: 'r_akihara' },
-            },
-        };
-        const outcome = (0, actions_1.performHire)(prepared, 'o_gento');
-        strict_1.default.equal(outcome.ok, true);
-        strict_1.default.equal(outcome.state.actionPoints, 2);
-        strict_1.default.equal(outcome.state.officers.o_gento.factionId, names_1.PLAYER_FACTION_ID);
-        strict_1.default.equal(outcome.state.officers.o_gento.locationRegionId, 'r_akihara');
+    test('ターン終了で月が進みNPCログも保持できる', () => {
+        const state = (0, createGame_1.createNewGame)(1234);
+        const next = (0, createGame_1.endTurn)(state);
+        strict_1.default.equal(next.turn, 2);
+        strict_1.default.equal(next.ap, next.apMax);
+        strict_1.default.ok(Array.isArray(next.log));
     });
     test('セーブデータのserialize/deserializeができる', () => {
-        const state = (0, initialGameData_1.createInitialGameState)('normal');
+        const state = (0, createGame_1.createNewGame)(1234);
         const raw = (0, save_1.serializeGameState)(state);
         const loaded = (0, save_1.deserializeSaveData)(raw);
         strict_1.default.equal(loaded.ok, true);
         strict_1.default.equal(loaded.state?.turn, 1);
     });
     test('壊れたセーブデータを拒否する', () => {
-        const raw = JSON.stringify({ version: 1, savedAt: new Date().toISOString(), state: { turn: 1, regions: {} } });
-        const loaded = (0, save_1.deserializeSaveData)(raw);
+        const loaded = (0, save_1.deserializeSaveData)('{ broken json');
         strict_1.default.equal(loaded.ok, false);
         strict_1.default.equal(loaded.state, null);
     });
     test('勝利条件を判定できる', () => {
-        const state = (0, initialGameData_1.createInitialGameState)('normal');
-        const regionEntries = Object.entries(state.regions);
-        const eightRegions = Object.fromEntries(regionEntries.map(([id, region], index) => [id, index < 8 ? { ...region, ownerFactionId: names_1.PLAYER_FACTION_ID } : region]));
-        const checked = (0, victory_1.checkGameStatus)({ ...state, regions: eightRegions });
-        strict_1.default.equal(checked.gameStatus, 'victory');
-        strict_1.default.equal(checked.result?.controlledRegions, 8);
-    });
-    test('25ターンのスモーク進行で状態が壊れない', () => {
-        let state = (0, initialGameData_1.createInitialGameState)('normal');
-        for (let index = 0; index < 25 && state.gameStatus === 'playing'; index += 1) {
-            state = (0, actions_1.performDomestic)(state, index % 2 === 0 ? 'riceYield' : 'publicOrder').state;
-            state = (0, actions_1.performRecruitTroops)(state).state;
-            state = (0, actions_1.performTrain)(state).state;
-            state = (0, actions_1.endPlayerTurn)(state).state;
-        }
-        strict_1.default.ok(typeof state.turn === 'number');
-        strict_1.default.ok(Object.keys(state.regions).length === 12);
-        strict_1.default.ok(Object.keys(state.factions).length >= 5);
-        strict_1.default.ok(Object.keys(state.officers).length >= 20);
+        const state = (0, createGame_1.createNewGame)(1234);
+        const regions = Object.fromEntries(Object.entries(state.regions).map(([id, region]) => [id, { ...region, factionId: 'akatsuki' }]));
+        strict_1.default.equal((0, createGame_1.checkVictory)({ ...state, regions }), 'win_dominate');
     });
     report();
 }
