@@ -44,4 +44,7 @@
 - [x] `npm test` で現行v2.1向けエンジンテスト9件が通過
 - [x] `npx tsc -b --pretty false` がエラーなし
 - [x] NPC侵攻がプレイヤー絡みでも作戦記に出ることを自動テストで確認
+- [x] CharacterPortrait追加後も全武将表示の型チェックが通過
+- [x] 1ターン目終了で即敗北しないことを自動テストで確認
+- [x] `npm test` は10件通過
 - [ ] `npm run build` は TypeScript 後の Vite/esbuild 実行ファイル起動が `spawn EPERM` で停止。Cloudflare Pages/通常PC環境で再確認する

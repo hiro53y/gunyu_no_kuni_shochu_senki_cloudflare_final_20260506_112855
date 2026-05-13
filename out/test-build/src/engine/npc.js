@@ -61,6 +61,9 @@ function tryNpcInvasion(state, fid, rng) {
     const defenderFid = target.factionId;
     if (!defenderFid)
         return state;
+    // 序盤の即死敗北を避ける。世界情勢は動くが、プレイヤー本国への直接侵攻は4ターン目から。
+    if (defenderFid === 'akatsuki' && state.turn < 4)
+        return state;
     const defenderIds = combatRoster(state, defenderFid, 3);
     const battle = (0, battle_1.initBattle)(state, {
         regionId: target.id,

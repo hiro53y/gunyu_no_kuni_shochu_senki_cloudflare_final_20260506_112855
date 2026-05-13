@@ -85,7 +85,7 @@ function run(): void {
   });
 
   test('NPC侵攻がプレイヤー絡みでも作戦記へ反映される', () => {
-    const state = createNewGame(1234);
+    const state = { ...createNewGame(1234), turn: 4 };
     const next = runNpcTurn(state, eagerRng());
 
     assert.ok(next.log.some((entry) => entry.type === 'battle'));
@@ -98,7 +98,15 @@ function run(): void {
 
     assert.equal(next.turn, 2);
     assert.equal(next.ap, next.apMax);
+    assert.equal(next.victory, 'none');
     assert.ok(Array.isArray(next.log));
+  });
+
+  test('1ターン目終了で即敗北しない', () => {
+    const next = endTurn(createNewGame(1));
+
+    assert.equal(next.turn, 2);
+    assert.notEqual(next.victory, 'lose_zero');
   });
 
   test('セーブデータのserialize/deserializeができる', () => {

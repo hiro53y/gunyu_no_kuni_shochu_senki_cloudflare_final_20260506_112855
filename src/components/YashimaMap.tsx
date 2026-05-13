@@ -1,11 +1,11 @@
 // ===========================================================================
 // 八洲マップSVG
-// 15地域＋勢力カラー塗り分け＋隣接線＋家紋風アイコン＋選択ハイライト
-// viewBox は 0 0 100 100、地域座標は data/regions.ts の mapX/mapY を使用。
+// 古地図・軍略図として見えるよう、和紙背景、街道、地形別拠点札、
+// 選択/隣接/侵攻可能状態を軽量SVGで表現する。
 // ===========================================================================
 
 import { useMemo } from 'react';
-import type { GameState, RegionId, FactionId } from '../types/game';
+import type { GameState, RegionId, FactionId, Terrain } from '../types/game';
 import { REGION_TEMPLATES } from '../data/regions';
 
 interface Props {
@@ -19,27 +19,111 @@ const FACTION_CLASS: Record<FactionId, string> = {
   honoo: 'honoo', rengein: 'rengein', youma: 'youma', ronin: 'ronin',
 };
 
-/** 地形ごとの装飾アイコン（家紋風シルエット）— SVGパスかシンボル */
-function terrainGlyph(terrain: string): string {
+const HOME_REGION: Partial<Record<FactionId, RegionId>> = {
+  akatsuki: '01',
+  kurogane: '02',
+  shion: '05',
+  shirasagi: '08',
+  honoo: '10',
+  rengein: '12',
+  youma: '13',
+  ronin: '15',
+};
+
+const TERRAIN_LABEL: Record<Terrain, string> = {
+  plain: '田',
+  mountain: '山',
+  port: '港',
+  pass: '峠',
+  field: '畑',
+  coast: '汐',
+  snow: '雪',
+  volcano: '火',
+  forest: '森',
+  mountain_temple: '寺',
+  cursed: '禍',
+  wasteland: '荒',
+  islands: '島',
+};
+
+function terrainClass(terrain: Terrain): string {
+  return `terrain-${terrain.replace('_', '-')}`;
+}
+
+function terrainIcon(terrain: Terrain, cx: number, cy: number) {
   switch (terrain) {
-    case 'mountain': return '⛰';
-    case 'mountain_temple': return '卍';
+    case 'mountain':
+    case 'mountain_temple':
+    case 'pass':
+      return (
+        <g className="terrainMini mountainMini" transform={`translate(${cx - 6} ${cy + 1})`}>
+          <path d="M0 8 L5 0 L10 8 Z M7 8 L12 3 L17 8 Z" />
+          {terrain === 'pass' && <path d="M4 8 C7 5 10 5 13 8" className="terrainStroke" />}
+        </g>
+      );
     case 'port':
     case 'coast':
-    case 'islands': return '〜';
-    case 'forest': return '森';
-    case 'volcano': return '火';
-    case 'snow': return '雪';
-    case 'cursed': return '禍';
-    case 'wasteland': return '荒';
-    case 'pass': return '峠';
-    case 'field': return '田';
-    default: return '原';
+    case 'islands':
+      return (
+        <g className="terrainMini waterMini" transform={`translate(${cx - 7} ${cy + 3})`}>
+          <path d="M0 2 Q3 0 6 2 T12 2 T18 2" />
+          <path d="M1 5 Q4 3 7 5 T13 5 T18 5" />
+        </g>
+      );
+    case 'forest':
+      return (
+        <g className="terrainMini forestMini" transform={`translate(${cx - 6} ${cy + 1})`}>
+          <path d="M2 8 L5 1 L8 8 Z M7 8 L10 0 L13 8 Z" />
+        </g>
+      );
+    case 'volcano':
+      return (
+        <g className="terrainMini volcanoMini" transform={`translate(${cx - 5} ${cy + 1})`}>
+          <path d="M0 8 L5 0 L10 8 Z" />
+          <path d="M4 0 L3 4 L7 4 L6 0 Z" className="terrainFlame" />
+        </g>
+      );
+    case 'snow':
+      return <text className="terrainGlyph snowGlyph" x={cx} y={cy + 8}>雪</text>;
+    case 'cursed':
+      return <text className="terrainGlyph cursedGlyph" x={cx} y={cy + 8}>禍</text>;
+    case 'wasteland':
+      return (
+        <g className="terrainMini wasteMini" transform={`translate(${cx - 7} ${cy + 4})`}>
+          <path d="M0 4 L6 1 L12 5 L18 2" />
+          <path d="M4 7 L9 5 L15 7" />
+        </g>
+      );
+    default:
+      return (
+        <g className="terrainMini fieldMini" transform={`translate(${cx - 7} ${cy + 2})`}>
+          <path d="M0 2 H18 M0 5 H18 M3 0 V7 M9 0 V7 M15 0 V7" />
+        </g>
+      );
   }
 }
 
+function roadPath(ax: number, ay: number, bx: number, by: number, seed: number): string {
+  const mx = (ax + bx) / 2;
+  const my = (ay + by) / 2;
+  const dx = bx - ax;
+  const dy = by - ay;
+  const len = Math.max(1, Math.hypot(dx, dy));
+  const bend = ((seed % 7) - 3) * 0.55;
+  const cx = mx - (dy / len) * bend;
+  const cy = my + (dx / len) * bend;
+  return `M ${ax} ${ay} Q ${cx} ${cy} ${bx} ${by}`;
+}
+
 export function YashimaMap({ state, selectedId, onSelect }: Props) {
-  // 隣接ペアのリスト（重複なし）
+  const templateById = useMemo(() => new Map(REGION_TEMPLATES.map((r) => [r.id, r])), []);
+  const playerRegions = useMemo(
+    () => new Set(Object.values(state.regions).filter((r) => r.factionId === 'akatsuki').map((r) => r.id)),
+    [state.regions],
+  );
+  const selectedRegion = selectedId ? state.regions[selectedId] : null;
+  const selectedAdj = useMemo(() => new Set(selectedRegion?.adjacentIds ?? []), [selectedRegion]);
+
   const adjacencyPairs = useMemo(() => {
     const pairs: Array<[string, string]> = [];
     const seen = new Set<string>();
@@ -55,114 +139,145 @@ export function YashimaMap({ state, selectedId, onSelect }: Props) {
     return pairs;
   }, []);
 
+  function isAttackable(regionId: RegionId): boolean {
+    const region = state.regions[regionId];
+    if (!region || region.factionId === 'akatsuki') return false;
+    return region.adjacentIds.some((id) => playerRegions.has(id));
+  }
+
   return (
     <svg
-      className="yashimaMap"
+      className="yashimaMap strategyMap"
       viewBox="0 0 100 100"
       xmlns="http://www.w3.org/2000/svg"
       preserveAspectRatio="xMidYMid meet"
       role="img"
-      aria-label="八洲全図"
+      aria-label="八洲軍略図"
     >
-      {/* 背景：和紙風 */}
       <defs>
-        <radialGradient id="paper-bg" cx="0.5" cy="0.5" r="0.8">
-          <stop offset="0%" stopColor="#2A241C" />
-          <stop offset="100%" stopColor="#14110F" />
+        <radialGradient id="paper-bg" cx="0.5" cy="0.45" r="0.82">
+          <stop offset="0%" stopColor="#3A3024" />
+          <stop offset="55%" stopColor="#211B16" />
+          <stop offset="100%" stopColor="#0D0B0A" />
         </radialGradient>
-        <pattern id="paper-noise" x="0" y="0" width="6" height="6" patternUnits="userSpaceOnUse">
-          <rect width="6" height="6" fill="transparent" />
-          <circle cx="1" cy="1" r="0.25" fill="rgba(196,184,149,0.04)" />
-          <circle cx="4" cy="3" r="0.18" fill="rgba(196,184,149,0.03)" />
+        <pattern id="paper-noise" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse">
+          <rect width="4" height="4" fill="transparent" />
+          <circle cx="0.7" cy="0.8" r="0.12" fill="#D4BE88" opacity="0.18" />
+          <circle cx="2.8" cy="1.9" r="0.10" fill="#000" opacity="0.16" />
+          <path d="M0 3.7 C1.5 3.2 2.5 4.2 4 3.5" stroke="#C9A24A" strokeWidth="0.05" opacity="0.14" />
         </pattern>
+        <filter id="ink-wobble">
+          <feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="2" seed="12" result="noise" />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.25" />
+        </filter>
+        <filter id="marker-glow">
+          <feGaussianBlur stdDeviation="1.15" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+        <linearGradient id="road-grad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#5A432C" />
+          <stop offset="50%" stopColor="#C9A24A" />
+          <stop offset="100%" stopColor="#5A432C" />
+        </linearGradient>
       </defs>
+
       <rect x="0" y="0" width="100" height="100" fill="url(#paper-bg)" />
       <rect x="0" y="0" width="100" height="100" fill="url(#paper-noise)" />
 
-      {/* 海原・空気感（緩い波線） */}
-      <g opacity="0.18" stroke="rgba(124, 154, 174, 0.5)" strokeWidth="0.15" fill="none">
-        <path d="M2 90 Q12 88 22 90 T42 90 T62 90 T82 90 T102 90" />
-        <path d="M0 94 Q15 92 30 94 T60 94 T90 94" />
-        <path d="M0 6 Q20 4 40 6 T80 6 T100 6" />
+      <g className="mapInkLines">
+        <path d="M4 15 C16 10 26 14 36 10 S61 7 73 12 S90 13 97 9" />
+        <path d="M2 83 C18 78 31 82 45 79 S75 73 97 78" />
+        <path d="M8 34 C22 29 39 33 49 28 S74 24 91 31" />
+        <path d="M11 57 C26 53 37 61 51 56 S74 50 90 55" />
       </g>
 
-      {/* 隣接線 */}
-      {adjacencyPairs.map(([a, b]) => {
-        const ra = REGION_TEMPLATES.find((r) => r.id === a);
-        const rb = REGION_TEMPLATES.find((r) => r.id === b);
-        if (!ra || !rb) return null;
-        return (
-          <line
-            key={`adj-${a}-${b}`}
-            className="adj-line"
-            x1={ra.mapX} y1={ra.mapY}
-            x2={rb.mapX} y2={rb.mapY}
-          />
-        );
-      })}
-
-      {/* 地域 */}
-      {REGION_TEMPLATES.map((tmpl) => {
-        const region = state.regions[tmpl.id];
-        if (!region) return null;
-        const fid = region.factionId;
-        const cls = fid ? FACTION_CLASS[fid] : 'neutral';
-        const isSelected = selectedId === tmpl.id;
-
-        // 地域の中心
-        const cx = tmpl.mapX;
-        const cy = tmpl.mapY;
-
-        // 不規則な多角形（地域形状）— 中心から放射状に半径をランダム化
-        // 確定的にしたいので、tmpl.id 由来のシード擬似で固定
-        const seedNum = parseInt(tmpl.id, 10) * 17 + 31;
-        const points = Array.from({ length: 8 }).map((_, i) => {
-          const ang = (i / 8) * Math.PI * 2;
-          const wobble = ((seedNum * (i + 1)) % 100) / 100; // 0..1
-          const r = 5.2 + wobble * 1.6;
-          return [cx + Math.cos(ang) * r, cy + Math.sin(ang) * r * 0.85];
-        });
-        const path = `M ${points.map((p) => p.join(',')).join(' L ')} Z`;
-
-        // プレイヤーが調略を進めている場合のマーカー
-        const scoutPct = region.scoutProgress.akatsuki ?? 0;
-
-        return (
-          <g key={tmpl.id} onClick={() => onSelect(tmpl.id)} style={{ cursor: 'pointer' }}>
+      <g className="roadLayer">
+        {adjacencyPairs.map(([a, b]) => {
+          const ra = templateById.get(a);
+          const rb = templateById.get(b);
+          if (!ra || !rb) return null;
+          const selectedRoad = selectedId === a || selectedId === b;
+          return (
             <path
-              className={`region-shape ${cls} ${isSelected ? 'selected' : ''}`}
-              d={path}
-              stroke="rgba(20,17,15,0.6)"
-              strokeWidth="0.4"
-              fillOpacity="0.85"
+              key={`road-${a}-${b}`}
+              className={`strategyRoad ${selectedRoad ? 'selected' : ''}`}
+              d={roadPath(ra.mapX, ra.mapY, rb.mapX, rb.mapY, Number(a) * 11 + Number(b) * 17)}
             />
-            {/* 国力ドット */}
-            <text className="region-power" x={cx} y={cy - 4.5}>
-              ◆×{region.power}
-            </text>
-            {/* 地域名 */}
-            <text className="region-text" x={cx} y={cy - 1.4}>
-              {tmpl.name}
-            </text>
-            {/* 地形グリフ */}
-            <text className="region-text" x={cx} y={cy + 2.2} style={{ fontSize: 2.8, opacity: 0.65 }}>
-              {terrainGlyph(tmpl.terrain)}
-            </text>
-            {/* 調略進捗マーカー */}
-            {scoutPct > 0 && fid !== 'akatsuki' && (
-              <circle cx={cx + 5} cy={cy - 4} r="1.2" fill="var(--c-shu)" stroke="var(--c-sumi)" strokeWidth="0.2" />
-            )}
-          </g>
-        );
-      })}
+          );
+        })}
+      </g>
 
-      {/* マップタイトル（左下） */}
-      <text x="3" y="97" fill="var(--c-kinari-d)" fontFamily="var(--font-fude)" fontSize="3" letterSpacing="0.5" opacity="0.55">
-        八洲全図
-      </text>
-      <text x="97" y="97" fill="var(--c-kinari-d)" fontFamily="var(--font-mincho)" fontSize="2" textAnchor="end" opacity="0.5">
-        群雄ノ國・掌中戦記
-      </text>
+      <g className="mapRegionLayer">
+        {REGION_TEMPLATES.map((tmpl, index) => {
+          const region = state.regions[tmpl.id];
+          if (!region) return null;
+          const fid = region.factionId;
+          const cls = fid ? FACTION_CLASS[fid] : 'neutral';
+          const isSelected = selectedId === tmpl.id;
+          const adjacent = selectedAdj.has(tmpl.id);
+          const attackable = isAttackable(tmpl.id);
+          const isHome = fid && HOME_REGION[fid] === tmpl.id;
+          const isPlayerHome = isHome && fid === 'akatsuki';
+          const isEnemyHome = isHome && fid !== 'akatsuki';
+          const cx = tmpl.mapX;
+          const cy = tmpl.mapY;
+          const width = tmpl.name.length >= 4 ? 15 : 13.2;
+          const height = 10.5;
+          const danger = fid && fid !== 'akatsuki' ? Math.min(9, region.power + (attackable ? 2 : 0)) : region.power;
+
+          return (
+            <g
+              key={tmpl.id}
+              className={[
+                'mapNode',
+                cls,
+                terrainClass(region.terrain),
+                isSelected && 'selected',
+                adjacent && 'adjacent',
+                attackable && 'attackable',
+                isPlayerHome && 'playerHome',
+                isEnemyHome && 'enemyHome',
+              ].filter(Boolean).join(' ')}
+              transform={`translate(${cx} ${cy})`}
+              style={{ cursor: 'pointer', animationDelay: `${index * 45}ms` }}
+              onClick={() => onSelect(tmpl.id)}
+            >
+              <ellipse className="nodeShadow" cx="0" cy="4.8" rx={width * 0.56} ry="2.6" />
+              {isHome && <circle className="homeAura" cx="0" cy="0" r={width * 0.72} />}
+              <path
+                className="nodeBanner"
+                d={`M ${-width / 2} ${-height / 2 + 1}
+                    Q ${-width / 2 + 1} ${-height / 2 - 1} ${-width / 2 + 3} ${-height / 2}
+                    L ${width / 2 - 2} ${-height / 2}
+                    Q ${width / 2 + 1} ${-height / 2 + 1} ${width / 2} ${-height / 2 + 3}
+                    L ${width / 2 - 1} ${height / 2 - 1}
+                    Q ${width / 2 - 2} ${height / 2 + 1} ${width / 2 - 4} ${height / 2}
+                    L ${-width / 2 + 2} ${height / 2}
+                    Q ${-width / 2 - 1} ${height / 2 - 1} ${-width / 2} ${height / 2 - 3} Z`}
+              />
+              <path className="nodeInnerLine" d={`M ${-width / 2 + 1.4} ${1.1} L ${width / 2 - 1.4} ${1.1}`} />
+              {terrainIcon(region.terrain, 0, -0.2)}
+              <text className="nodeName" x="0" y="-1.8">{tmpl.name}</text>
+              <text className="nodeInfo" x="0" y="4.4">
+                {TERRAIN_LABEL[region.terrain]} / {fid === 'akatsuki' ? `収${region.power}` : `危${danger}`}
+              </text>
+              {attackable && <path className="attackRune" d={`M ${width / 2 - 3} ${-height / 2 + 1} L ${width / 2 - 0.6} ${-height / 2 + 3.4} L ${width / 2 - 3} ${-height / 2 + 5.8}`} />}
+              {region.scoutProgress.akatsuki ? (
+                <circle className="scoutDot" cx={width / 2 - 1.6} cy={height / 2 - 1.5} r="1.1" />
+              ) : null}
+            </g>
+          );
+        })}
+      </g>
+
+      <g className="mapLegend">
+        <path d="M3 91 H26 V98 H3 Z" />
+        <text x="5" y="95">八洲軍略図</text>
+      </g>
+      <text className="mapSeal" x="96" y="96" textAnchor="end">掌中戦記</text>
     </svg>
   );
 }

@@ -1873,3 +1873,406 @@
     font-size: 11px;
   }
 }
+
+/* =========================================================================
+   2026-05-13 Visual Upgrade: 顔グラ・古地図・リザルト演出
+   ========================================================================= */
+
+.characterPortrait {
+  background:
+    linear-gradient(145deg, rgba(255, 226, 145, 0.08), transparent 36%),
+    #0f0c0a;
+  border-color: rgba(201, 162, 74, 0.45);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 232, 170, 0.08),
+    0 3px 10px rgba(0, 0, 0, 0.45);
+}
+.characterPortrait .characterFrame {
+  display: block;
+  filter: saturate(1.04) contrast(1.06);
+}
+.characterPortrait.role-enemyLord {
+  border-color: rgba(169, 48, 96, 0.7);
+  box-shadow: 0 0 14px rgba(95, 20, 56, 0.5), inset 0 0 0 1px rgba(210, 96, 170, 0.14);
+}
+.characterPortrait.role-attacker,
+.characterPortrait.role-brute {
+  border-color: rgba(225, 95, 52, 0.62);
+}
+.characterPortrait.role-strategist {
+  border-color: rgba(150, 138, 220, 0.62);
+}
+.characterPortrait.role-defender {
+  border-color: rgba(110, 176, 190, 0.58);
+}
+.portrait.selected,
+.characterPortrait.selected {
+  box-shadow:
+    0 0 0 2px rgba(255, 214, 110, 0.68),
+    0 0 20px rgba(255, 214, 110, 0.52),
+    inset 0 0 0 1px rgba(255, 232, 170, 0.18);
+}
+
+.mapArea {
+  background:
+    radial-gradient(ellipse at 50% 48%, rgba(201, 162, 74, 0.10), transparent 54%),
+    linear-gradient(180deg, #0b0908 0%, #15110e 48%, #0b0908 100%);
+}
+.strategyMap {
+  width: min(100%, 880px);
+  height: min(100%, 820px);
+  max-height: 100%;
+  filter: drop-shadow(0 20px 32px rgba(0, 0, 0, 0.45));
+}
+.mapInkLines path {
+  fill: none;
+  stroke: rgba(188, 164, 115, 0.18);
+  stroke-width: 0.24;
+  filter: url(#ink-wobble);
+}
+.strategyRoad {
+  fill: none;
+  stroke: rgba(118, 91, 55, 0.78);
+  stroke-width: 1.15;
+  stroke-linecap: round;
+  stroke-dasharray: 0.9 1.35;
+  opacity: 0.8;
+  filter: url(#ink-wobble);
+  pointer-events: none;
+}
+.strategyRoad::selection { background: transparent; }
+.strategyRoad.selected {
+  stroke: url(#road-grad);
+  stroke-width: 1.75;
+  stroke-dasharray: none;
+  opacity: 1;
+  filter: drop-shadow(0 0 4px rgba(201, 162, 74, 0.62));
+}
+.mapNode {
+  opacity: 0;
+  animation: nodeRise 0.42s ease forwards;
+}
+@keyframes nodeRise {
+  from { opacity: 0; filter: blur(2px); }
+  to { opacity: 1; }
+}
+.nodeShadow {
+  fill: rgba(0, 0, 0, 0.38);
+  pointer-events: none;
+}
+.homeAura {
+  fill: none;
+  stroke-width: 1.25;
+  opacity: 0.82;
+  filter: url(#marker-glow);
+  pointer-events: none;
+}
+.playerHome .homeAura {
+  stroke: rgba(255, 214, 110, 0.9);
+  animation: homePulse 1.8s ease-in-out infinite;
+}
+.enemyHome .homeAura {
+  stroke: rgba(190, 50, 52, 0.82);
+  animation: enemyPulse 2.2s ease-in-out infinite;
+}
+@keyframes homePulse {
+  0%, 100% { opacity: 0.45; transform: scale(0.96); }
+  50% { opacity: 0.95; transform: scale(1.06); }
+}
+@keyframes enemyPulse {
+  0%, 100% { opacity: 0.32; transform: scale(0.98); }
+  50% { opacity: 0.82; transform: scale(1.08); }
+}
+.nodeBanner {
+  fill: rgba(34, 28, 22, 0.95);
+  stroke: rgba(201, 162, 74, 0.38);
+  stroke-width: 0.55;
+  filter: drop-shadow(0 1.5px 1.8px rgba(0, 0, 0, 0.7));
+  transition: filter 0.16s ease, stroke-width 0.16s ease, transform 0.16s ease;
+}
+.mapNode.akatsuki .nodeBanner { fill: rgba(104, 35, 31, 0.96); stroke: rgba(255, 205, 100, 0.65); }
+.mapNode.kurogane .nodeBanner { fill: rgba(51, 53, 60, 0.96); }
+.mapNode.shion .nodeBanner { fill: rgba(63, 43, 86, 0.96); stroke: rgba(176, 130, 220, 0.58); }
+.mapNode.shirasagi .nodeBanner { fill: rgba(114, 116, 124, 0.96); stroke: rgba(230, 230, 238, 0.45); }
+.mapNode.honoo .nodeBanner { fill: rgba(126, 39, 25, 0.96); stroke: rgba(236, 90, 44, 0.55); }
+.mapNode.rengein .nodeBanner { fill: rgba(42, 88, 65, 0.96); stroke: rgba(126, 196, 150, 0.48); }
+.mapNode.youma .nodeBanner { fill: rgba(16, 12, 17, 0.98); stroke: rgba(150, 54, 122, 0.62); }
+.mapNode.ronin .nodeBanner { fill: rgba(28, 48, 85, 0.96); stroke: rgba(104, 142, 210, 0.48); }
+.mapNode.attackable .nodeBanner {
+  stroke: rgba(255, 214, 110, 0.92);
+  animation: attackableGlow 1.7s ease-in-out infinite;
+}
+.mapNode.selected .nodeBanner {
+  stroke: #FFD66E;
+  stroke-width: 1.1;
+  filter:
+    drop-shadow(0 0 3px rgba(255, 214, 110, 0.95))
+    drop-shadow(0 6px 8px rgba(0, 0, 0, 0.72));
+}
+.mapNode.adjacent:not(.selected) .nodeBanner {
+  stroke: rgba(232, 190, 92, 0.68);
+}
+@keyframes attackableGlow {
+  0%, 100% { filter: drop-shadow(0 0 1px rgba(255, 214, 110, 0.36)); }
+  50% { filter: drop-shadow(0 0 5px rgba(255, 214, 110, 0.72)); }
+}
+.nodeInnerLine {
+  stroke: rgba(255, 232, 170, 0.28);
+  stroke-width: 0.28;
+  pointer-events: none;
+}
+.nodeName {
+  fill: #FFF1C6;
+  font-family: var(--font-fude);
+  font-size: 3px;
+  text-anchor: middle;
+  letter-spacing: 0.2px;
+  pointer-events: none;
+  paint-order: stroke;
+  stroke: rgba(6, 4, 3, 0.95);
+  stroke-width: 0.75;
+}
+.nodeInfo {
+  fill: #D8C38D;
+  font-family: var(--font-mincho);
+  font-size: 1.85px;
+  text-anchor: middle;
+  pointer-events: none;
+  paint-order: stroke;
+  stroke: rgba(6, 4, 3, 0.82);
+  stroke-width: 0.45;
+}
+.terrainMini {
+  fill: none;
+  stroke: rgba(255, 226, 145, 0.48);
+  stroke-width: 0.45;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.terrainMini.fieldMini { stroke: rgba(240, 198, 104, 0.4); }
+.terrainMini.forestMini { fill: rgba(78, 140, 86, 0.38); stroke: rgba(152, 209, 139, 0.42); }
+.terrainMini.mountainMini { fill: rgba(140, 138, 132, 0.34); stroke: rgba(228, 220, 194, 0.42); }
+.terrainMini.waterMini { stroke: rgba(120, 178, 210, 0.6); }
+.terrainMini.volcanoMini { fill: rgba(112, 38, 28, 0.45); stroke: rgba(238, 93, 54, 0.55); }
+.terrainFlame { fill: rgba(238, 93, 54, 0.68); stroke: none; }
+.wasteMini { stroke: rgba(185, 132, 84, 0.42); }
+.terrainGlyph {
+  text-anchor: middle;
+  font-family: var(--font-fude);
+  font-size: 2.2px;
+  pointer-events: none;
+}
+.snowGlyph { fill: rgba(230, 232, 238, 0.74); }
+.cursedGlyph { fill: rgba(199, 72, 155, 0.66); }
+.attackRune {
+  fill: none;
+  stroke: #FFD66E;
+  stroke-width: 0.8;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+.scoutDot {
+  fill: var(--c-shu);
+  stroke: #120908;
+  stroke-width: 0.25;
+}
+.mapLegend path {
+  fill: rgba(12, 9, 7, 0.45);
+  stroke: rgba(201, 162, 74, 0.32);
+}
+.mapLegend text,
+.mapSeal {
+  fill: rgba(228, 204, 150, 0.58);
+  font-family: var(--font-fude);
+  font-size: 2.5px;
+  letter-spacing: 0.4px;
+}
+
+.battleScreen {
+  background:
+    radial-gradient(ellipse at 18% 45%, rgba(200, 74, 74, 0.18), transparent 42%),
+    radial-gradient(ellipse at 82% 45%, rgba(126, 91, 163, 0.16), transparent 42%),
+    linear-gradient(180deg, #0E0A08 0%, #1A1110 60%, #0B0807 100%);
+}
+.battleField {
+  position: relative;
+}
+.battleField::before {
+  content: '';
+  position: absolute;
+  inset: 46px 0 160px;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(200, 74, 74, 0.12), transparent 38%, transparent 62%, rgba(126, 91, 163, 0.12)),
+    repeating-linear-gradient(0deg, transparent 0 13px, rgba(201, 162, 74, 0.03) 13px 14px);
+  opacity: 0.8;
+}
+.formationGauge {
+  background: rgba(9, 7, 6, 0.42);
+  border: 1px solid rgba(201, 162, 74, 0.24);
+  border-radius: 4px;
+  padding: 6px 5px;
+}
+.formGaugeBar {
+  border-color: rgba(201, 162, 74, 0.45) !important;
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.8), 0 0 12px rgba(201, 162, 74, 0.14);
+}
+.formGaugePlayer {
+  background: linear-gradient(180deg, #F0B45A, var(--f-akatsuki)) !important;
+}
+.formGaugeEnemy {
+  background: linear-gradient(180deg, #7E5BA3, #201024) !important;
+}
+.battleCard:not(.empty) {
+  background:
+    linear-gradient(135deg, rgba(255, 226, 145, 0.06), transparent 36%),
+    rgba(28, 21, 17, 0.94);
+}
+.battleCard.active::after {
+  content: '手番';
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  padding: 1px 4px;
+  font-size: 9px;
+  color: #1A1008;
+  background: #FFD66E;
+  border-radius: 2px;
+  font-family: var(--font-fude);
+  letter-spacing: 1px;
+}
+.battleCard.selectedTarget::after {
+  content: '標的';
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  padding: 1px 4px;
+  font-size: 9px;
+  color: #FFE8FF;
+  background: rgba(156, 45, 132, 0.92);
+  border-radius: 2px;
+  font-family: var(--font-fude);
+  letter-spacing: 1px;
+}
+.damageFlash {
+  color: #FFD66E;
+  text-shadow: 0 0 6px #C84A4A, 0 0 16px rgba(255, 214, 110, 0.75);
+}
+.actionBtn:not(:disabled):active {
+  transform: translateY(1px) scale(0.99);
+}
+
+.resultBackdrop {
+  background:
+    radial-gradient(ellipse at 50% 35%, rgba(200, 74, 74, 0.2), transparent 48%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.86), rgba(15, 8, 7, 0.94)) !important;
+}
+.resultBackdrop::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(115deg, transparent 0 24%, rgba(201, 162, 74, 0.08) 24% 25%, transparent 25% 100%),
+    radial-gradient(ellipse at 20% 78%, rgba(80, 65, 45, 0.45), transparent 34%),
+    radial-gradient(ellipse at 82% 70%, rgba(90, 37, 35, 0.36), transparent 38%);
+  opacity: 0.95;
+}
+.resultBox {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(160deg, rgba(255, 226, 145, 0.08), transparent 28%),
+    rgba(23, 18, 15, 0.97);
+  box-shadow: 0 0 70px rgba(0, 0, 0, 0.72), 0 0 42px rgba(201, 162, 74, 0.18);
+}
+.resultBox::before {
+  content: '';
+  position: absolute;
+  inset: -16px;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(92deg, transparent 0 22px, rgba(201, 162, 74, 0.035) 22px 24px),
+    radial-gradient(ellipse at 50% 115%, rgba(160, 72, 46, 0.28), transparent 44%);
+}
+.resultBox > * {
+  position: relative;
+}
+.resultTitle {
+  line-height: 0.95;
+  animation: resultStamp 0.55s ease both;
+}
+@keyframes resultStamp {
+  from { opacity: 0; transform: scale(1.18); filter: blur(4px); }
+  to { opacity: 1; transform: scale(1); filter: blur(0); }
+}
+.resultMvp {
+  background:
+    linear-gradient(90deg, rgba(201, 162, 74, 0.18), rgba(80, 46, 32, 0.18)),
+    rgba(0, 0, 0, 0.24);
+}
+.resultMvpBody .portrait {
+  width: 88px !important;
+  height: 110px !important;
+}
+.resultMvpBody .portrait svg {
+  width: 88px !important;
+  height: 110px !important;
+}
+.resultBtn {
+  border: 1px solid rgba(255, 226, 145, 0.38);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.34);
+}
+
+.titleScreen {
+  background:
+    radial-gradient(circle at 50% 37%, rgba(255, 214, 110, 0.16), transparent 18%),
+    radial-gradient(ellipse at 50% 72%, rgba(99, 36, 24, 0.28), transparent 48%),
+    #0B0807;
+}
+.titleLogo {
+  text-shadow: 0 0 20px rgba(201, 162, 74, 0.4), 0 3px 0 rgba(0, 0, 0, 0.72);
+}
+.titleMenu button {
+  border-color: rgba(201, 162, 74, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(255, 232, 170, 0.05), 0 5px 18px rgba(0, 0, 0, 0.28);
+}
+.titleMenu button:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: inset 0 0 0 1px rgba(255, 232, 170, 0.08), 0 8px 24px rgba(0, 0, 0, 0.36);
+}
+
+@media (max-width: 899px) {
+  .strategyMap {
+    width: 100%;
+    height: auto;
+    min-height: 0;
+  }
+  .nodeName {
+    font-size: 3.35px;
+    stroke-width: 0.82;
+  }
+  .nodeInfo {
+    font-size: 2.1px;
+  }
+  .strategyRoad {
+    stroke-width: 1.28;
+  }
+  .resultBox {
+    width: min(94vw, 560px);
+    padding: 24px 16px;
+  }
+  .resultTitle {
+    font-size: 52px;
+    letter-spacing: 10px;
+  }
+  .resultMvpBody .portrait {
+    width: 76px !important;
+    height: 95px !important;
+  }
+  .resultMvpBody .portrait svg {
+    width: 76px !important;
+    height: 95px !important;
+  }
+}

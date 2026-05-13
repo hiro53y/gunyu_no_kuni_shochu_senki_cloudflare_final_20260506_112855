@@ -132,3 +132,18 @@ OneDrive の同期保護で `rm` できなかったため、`echo > file` で内
 - `npm test` → 9件通過
 - `npx tsc -b --pretty false` → エラーなし
 - `npm run build` → TypeScript は通過するが、このCodex/OneDrive環境では Vite/esbuild の実行ファイル起動が `spawn EPERM` で停止。コード起因の型エラーではないため、Cloudflare Pages または通常PC環境で再確認する。
+
+---
+
+## 2026-05-13 ビジュアル優先改修メモ
+
+- `src/components/CharacterPortrait.tsx` を追加。外部画像に依存せず、武将ID・名前・能力値・所属勢力からSVG顔グラを決定的に生成する。
+- `GeneralPortrait.tsx` は互換レイヤー化し、既存の登用、出陣、合戦、地域パネル、リザルト表示をすべて新ポートレートへ接続。
+- `YashimaMap.tsx` を古地図・軍略図風へ全面更新。暗い和紙、墨線、街道、地形別拠点札、侵攻可能マーカー、本拠地オーラ、選択街道強調を追加。
+- `screens.css` に顔グラ、古地図、合戦対峙感、戦況ゲージ、リザルト背景演出、タイトル画面の押せる感を追加。
+- 1ターン目終了時にNPCが暁原へ即侵攻して敗北する問題を修正。プレイヤー領への直接侵攻は4ターン目以降に制限。
+
+### 追加検証
+- `npx tsc -b --pretty false` → エラーなし
+- `npm test` → 10件通過
+- `npm run build` → TypeScript後、Vite/esbuild 起動が `spawn EPERM` で停止。この環境固有の実行制限として継続。
