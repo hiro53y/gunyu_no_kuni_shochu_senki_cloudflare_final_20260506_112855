@@ -403,7 +403,8 @@ function determineResult(battle: BattleState): BattleResult {
 // --- 自動進行 ---------------------------------------------------------------
 
 /** AI が選ぶスキル（高威力をランダムに） */
-function pickAiSkill(general: General, rng: Rng): string {
+function pickAiSkill(general: General, rng: Rng, strategicTurn = 99): string {
+  if (strategicTurn <= 3 && rng.chance(0.45)) return 'sk_zangeki';
   const candidates = general.skillIds.length > 0 ? general.skillIds : ['sk_zangeki'];
   return rng.pick(candidates);
 }
@@ -419,7 +420,7 @@ export function autoStep(battle: BattleState, state: GameState, rng: Rng): Battl
   if (!slot.generalId) return next;
   const g = state.generals[slot.generalId];
   if (!g) return next;
-  const skillId = pickAiSkill(g, rng);
+  const skillId = actor.side === 'enemy' ? pickAiSkill(g, rng, state.turn) : pickAiSkill(g, rng);
   const after = executeAction({ battle: next, state, actor, skillId, targetIndex: null, rng });
   return { ...after, result: determineResult(after) };
 }
@@ -465,7 +466,7 @@ export function aiExecuteAction(
   if (!slot.generalId) return battle;
   const g = state.generals[slot.generalId];
   if (!g) return battle;
-  const skillId = pickAiSkill(g, rng);
+  const skillId = pickAiSkill(g, rng, state.turn);
   const after = executeAction({ battle, state, actor, skillId, targetIndex: null, rng });
   return { ...after, result: determineResult(after) };
 }

@@ -23,6 +23,7 @@ class AudioManager {
   private gainSfx: GainNode | null = null;
   private gainBgm: GainNode | null = null;
   private bgmSource: AudioBufferSourceNode | null = null;
+  private bgmOscillators: OscillatorNode[] = [];
   private currentBgmKey: string | null = null;
 
   /** 設定で持っている音量（0〜1）。AudioContext が無くても保持できる */
@@ -189,15 +190,19 @@ class AudioManager {
 
   // --- BGM（ファイルがあれば読み込んでループ。無ければ無音） ---------------
 
-  async playBgm(key: 'title' | 'map' | 'battle'): Promise<void> {
+  async playBgm(key: 'title' | 'map' | 'battle' | 'defeat'): Promise<void> {
     if (!this.ensure() || !this.ctx || !this.gainBgm) return;
+    this.resume();
     if (this.currentBgmKey === key) return;
     this.stopBgm();
 
     const url = `/assets/sounds/bgm/${key}.mp3`;
     try {
       const resp = await fetch(url);
-      if (!resp.ok) return; // ファイル無し→無音
+      if (!resp.ok) {
+        this.playGeneratedBgm(key);
+        return;
+      }
       const data = await resp.arrayBuffer();
       const buffer = await this.ctx.decodeAudioData(data);
       const src = this.ctx.createBufferSource();
@@ -208,7 +213,7 @@ class AudioManager {
       this.bgmSource = src;
       this.currentBgmKey = key;
     } catch {
-      // 失敗時は無音継続
+      this.playGeneratedBgm(key);
     }
   }
 
@@ -218,7 +223,35 @@ class AudioManager {
       this.bgmSource.disconnect();
       this.bgmSource = null;
     }
+    for (const osc of this.bgmOscillators) {
+      try { osc.stop(); } catch { /* ignore */ }
+      osc.disconnect();
+    }
+    this.bgmOscillators = [];
     this.currentBgmKey = null;
+  }
+
+  private playGeneratedBgm(key: 'title' | 'map' | 'battle' | 'defeat'): void {
+    if (!this.ctx || !this.gainBgm || this.bgmVolume <= 0) return;
+    const t = this.ctx.currentTime;
+    const patterns: Record<'title' | 'map' | 'battle' | 'defeat', number[]> = {
+      title: [196, 246.94, 293.66],
+      map: [220, 277.18, 329.63],
+      battle: [130.81, 196, 261.63],
+      defeat: [196, 174.61, 146.83],
+    };
+    const freqs = patterns[key];
+    this.bgmOscillators = freqs.map((freq, i) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      osc.type = i === 0 ? 'triangle' : 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(i === 0 ? 0.035 : 0.018, t);
+      osc.connect(gain).connect(this.gainBgm!);
+      osc.start(t + i * 0.03);
+      return osc;
+    });
+    this.currentBgmKey = key;
   }
 }
 

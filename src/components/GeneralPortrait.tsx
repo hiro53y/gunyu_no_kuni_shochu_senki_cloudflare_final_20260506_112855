@@ -1,7 +1,71 @@
-// ===========================================================================
-// 互換レイヤー
-// 既存画面は GeneralPortrait を参照しているため、新しい CharacterPortrait
-// をここから再エクスポートして全武将表示を一括差し替えする。
-// ===========================================================================
+import { useEffect, useState } from 'react';
+import type { General } from '../types/game';
+import { CharacterPortrait } from './CharacterPortrait';
 
-export { CharacterPortrait as GeneralPortrait } from './CharacterPortrait';
+interface Props {
+  general: General;
+  size?: number;
+  showLabel?: boolean;
+  selected?: boolean;
+}
+
+function portraitUrl(key: string, ext: 'png' | 'jpg'): string {
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+  return `${base}/assets/portraits/${key}.${ext}`;
+}
+
+export function GeneralPortrait({ general, size = 64, showLabel = true, selected = false }: Props) {
+  const [stage, setStage] = useState<'png' | 'jpg' | 'fallback'>('png');
+  const [loaded, setLoaded] = useState(false);
+  const h = Math.round(size * 1.25);
+
+  useEffect(() => {
+    setStage('png');
+    setLoaded(false);
+  }, [general.portraitKey]);
+
+  if (stage === 'fallback') {
+    return <CharacterPortrait general={general} size={size} showLabel={showLabel} selected={selected} />;
+  }
+
+  return (
+    <div
+      className={`portrait imagePortrait ${selected ? 'selected' : ''}`}
+      style={{ width: size, height: showLabel ? h + 14 : h, position: 'relative' }}
+      title={general.name}
+    >
+      <CharacterPortrait general={general} size={size} showLabel={false} selected={selected} />
+      <img
+        key={`${general.portraitKey}-${stage}`}
+        src={portraitUrl(general.portraitKey, stage)}
+        alt={general.name}
+        width={size}
+        height={h}
+        onLoad={() => setLoaded(true)}
+        onError={() => {
+          if (stage === 'png') {
+            setStage('jpg');
+            setLoaded(false);
+          } else {
+            setStage('fallback');
+          }
+        }}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: size,
+          height: h,
+          objectFit: 'cover',
+          opacity: loaded ? 1 : 0,
+          transition: 'opacity 0.18s ease',
+          pointerEvents: 'none',
+        }}
+      />
+      {showLabel && (
+        <div className="label">
+          {general.name.split(' ').slice(-1)[0]}
+        </div>
+      )}
+    </div>
+  );
+}

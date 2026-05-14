@@ -4,8 +4,7 @@
 
 import type { GameState, RegionId, FactionId } from '../types/game';
 import { GeneralPortrait } from './GeneralPortrait';
-import { TERRAIN_BONUSES } from '../data/regions';
-import { regionFood, regionIncome } from '../engine/economy';
+import { createBattleForecast, getDeployableGenerals } from '../engine/battleIntel';
 
 interface Props {
   state: GameState;
@@ -28,39 +27,6 @@ const TERRAIN_LABEL: Record<string, string> = {
   forest: '深い森', mountain_temple: '山岳寺領', cursed: '魔境',
   wasteland: '荒野', islands: '群島',
 };
-
-function satisfactionText(value: number): string {
-  if (value >= 80) return '高いほど収入が伸び、一揆が起きにくい。現在は安定圏。';
-  if (value >= 55) return '収入は標準。徴収や戦後支配で下がるため維持が必要。';
-  if (value >= 30) return '収入が落ち、治安悪化が近い。建設より立て直し優先。';
-  return '危険域。収入低下と反乱リスクが大きい。早めに手当てしたい。';
-}
-
-function RegionInsight({ state, regionId }: Props) {
-  if (!regionId) return null;
-  const region = state.regions[regionId];
-  if (!region) return null;
-  const bonus = TERRAIN_BONUSES[region.terrain];
-  const income = regionIncome(region);
-  const food = regionFood(region);
-
-  return (
-    <div className="regionInsight">
-      <div className="insightItem">
-        <span className="insightLabel">地形効果</span>
-        <span className="insightText">{bonus?.note ?? '補正なし'}</span>
-      </div>
-      <div className="insightItem">
-        <span className="insightLabel">収入見込み</span>
-        <span className="insightText">毎月 金+{income.toLocaleString()} / 兵糧+{food.toLocaleString()}</span>
-      </div>
-      <div className="insightItem">
-        <span className="insightLabel">満足度</span>
-        <span className="insightText">{satisfactionText(region.satisfaction)}</span>
-      </div>
-    </div>
-  );
-}
 
 export function RegionPanel({ state, regionId }: Props) {
   if (!regionId) {
@@ -85,6 +51,16 @@ export function RegionPanel({ state, regionId }: Props) {
 
   const isPlayer = factionId === 'akatsuki';
   const isAdjacent = region.adjacentIds.some((aid) => state.regions[aid]?.factionId === 'akatsuki');
+  const forecast = !isPlayer && isAdjacent
+    ? createBattleForecast(state, regionId, getDeployableGenerals(state).slice(0, 3))
+    : null;
+  const recLabel = forecast?.recommendation === 'high'
+    ? '高'
+    : forecast?.recommendation === 'medium'
+      ? '中'
+      : forecast?.recommendation === 'low'
+        ? '低'
+        : null;
 
   return (
     <aside className="regionPanel" aria-label="地域詳細">
@@ -131,9 +107,14 @@ export function RegionPanel({ state, regionId }: Props) {
             <span className="value">{region.scoutProgress.akatsuki ?? 0} / 100</span>
           </div>
         )}
+        {forecast && recLabel && (
+          <div className={`regionRecommendation ${forecast.recommendation}`}>
+            <span>おすすめ度：{recLabel}</span>
+            <small>理由：{forecast.recommendationReason}</small>
+            <small>勝率目安 {forecast.winRate}% / {forecast.mainReason}</small>
+          </div>
+        )}
       </div>
-
-      <RegionInsight state={state} regionId={regionId} />
 
       <div className="regionGenerals">
         <h4>所属武将（{generalsHere.length}）</h4>
@@ -170,10 +151,12 @@ export function RegionPopup({ state, regionId }: Props) {
   const factionId = region.factionId;
   const factionName = factionId ? FACTION_NAME[factionId] : '無主';
   const factionColor = factionId ? FACTION_VAR[factionId] : 'var(--c-kinari-d)';
-  const generalsHere = Object.values(state.generals).filter(
-    (g) => g.factionId === factionId && (g.status === 'free' || g.status === 'recruited'),
-  );
-  const recentLog = state.log[0]?.message ?? 'まだ何も起こっていない';
+  const isPlayer = factionId === 'akatsuki';
+  const isAdjacent = !isPlayer && region.adjacentIds.some((aid) => state.regions[aid]?.factionId === 'akatsuki');
+  const forecast = isAdjacent
+    ? createBattleForecast(state, regionId, getDeployableGenerals(state).slice(0, 3))
+    : null;
+  const recLabel = forecast?.recommendation === 'high' ? '高' : forecast?.recommendation === 'medium' ? '中' : forecast?.recommendation === 'low' ? '低' : null;
 
   return (
     <div className="regionPopup">
@@ -184,20 +167,11 @@ export function RegionPopup({ state, regionId }: Props) {
       <div style={{ fontSize: 11, color: 'var(--c-kinari-d)' }}>
         {TERRAIN_LABEL[region.terrain]} ／ {region.product} ／ 国力{region.power} ／ 満足{region.satisfaction}
       </div>
-      <RegionInsight state={state} regionId={regionId} />
-      <div className="mobileRegionExtra">
-        <div>
-          <span className="miniLabel">作戦記</span>
-          <span className="miniText">{recentLog}</span>
+      {forecast && recLabel && (
+        <div className={`popupRecommendation ${forecast.recommendation}`}>
+          おすすめ度：{recLabel}　{forecast.recommendationReason}
         </div>
-        <div>
-          <span className="miniLabel">所属武将</span>
-          <span className="miniText">
-            {generalsHere.length === 0 ? 'なし' : generalsHere.slice(0, 3).map((g) => g.name.replace(/^.*\s/, '')).join('、')}
-            {generalsHere.length > 3 ? ` 他${generalsHere.length - 3}名` : ''}
-          </span>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

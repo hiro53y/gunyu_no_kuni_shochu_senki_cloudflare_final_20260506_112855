@@ -71,7 +71,7 @@ export function BattleCard({ state, slot, side, isActive, isTargetable, isSelect
           </div>
           <div className="cardMeta">
             <span className="guardBadge">守{slot.guard}%</span>
-            <span className="costBadge">兵{Math.round(slot.hp / 10)}</span>
+            <span className="costBadge">兵力{Math.round(slot.hp / 10)}</span>
           </div>
         </div>
       </div>
@@ -83,6 +83,7 @@ export function BattleCard({ state, slot, side, isActive, isTargetable, isSelect
         ))}
       </div>
       <div className="statusRow">
+        {slot.statusEffects.length === 0 && <span className="statusBadge normal">平常</span>}
         {slot.statusEffects.map((e, i) => {
           const def = STATUS_GLYPH[e.type];
           return (

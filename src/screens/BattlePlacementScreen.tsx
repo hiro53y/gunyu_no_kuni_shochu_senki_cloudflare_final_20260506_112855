@@ -3,11 +3,18 @@
 // 自勢力武将から最大3名を選び、前列・中列・後列に配置する。
 // ===========================================================================
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { GameState, GeneralId, RegionId, FactionId } from '../types/game';
 import { GeneralPortrait } from '../components/GeneralPortrait';
-import { TERRAIN_BONUSES } from '../data/regions';
 import { audio } from '../audio/AudioManager';
+import {
+  createBattleForecast,
+  getDeployableGenerals,
+  getEnemyPreviewGenerals,
+  hasBattleHistory,
+  summarizeGenerals,
+} from '../engine/battleIntel';
+import { TERRAIN_BONUSES } from '../data/regions';
 
 interface Props {
   state: GameState;
@@ -22,10 +29,8 @@ const FACTION_NAME: Record<FactionId, string> = {
 };
 
 const ROW_LABELS = ['前列', '中列', '後列'];
-
-function forceValue(g: { stats: { power: number; command: number }; troopCurrent: number }): number {
-  return Math.round(g.troopCurrent * (1 + (g.stats.power + g.stats.command) / 220));
-}
+const RATING_LABEL = { advantage: '有利', even: '互角', disadvantage: '不利' } as const;
+const RATING_CLASS = { advantage: 'good', even: 'warn', disadvantage: 'bad' } as const;
 
 export function BattlePlacementScreen({ state, regionId, onConfirm, onCancel }: Props) {
   // 配置スロット：[front, middle, back]
@@ -37,22 +42,31 @@ export function BattlePlacementScreen({ state, regionId, onConfirm, onCancel }: 
 
   // 出陣可能な武将（自勢力・status free/recruited・兵数>0）
   const roster = useMemo(() => {
-    return Object.values(state.generals)
-      .filter((g) => g.factionId === 'akatsuki')
-      .filter((g) => g.status === 'free' || g.status === 'recruited')
-      .filter((g) => g.troopCurrent > 0)
-      .sort((a, b) => (b.stats.power + b.stats.command) - (a.stats.power + a.stats.command));
+    return getDeployableGenerals(state);
   }, [state.generals]);
 
   // 敵プレビュー（上位3名）
   const enemyPreview = useMemo(() => {
-    if (!enemyFid) return [];
-    return Object.values(state.generals)
-      .filter((g) => g.factionId === enemyFid)
-      .filter((g) => g.troopCurrent > 0)
-      .sort((a, b) => (b.stats.power + b.stats.command) - (a.stats.power + a.stats.command))
-      .slice(0, 3);
-  }, [state.generals, enemyFid]);
+    return getEnemyPreviewGenerals(state, regionId);
+  }, [state, regionId]);
+
+  const availableStats = useMemo(() => summarizeGenerals(roster), [roster]);
+  const placedGenerals = useMemo(() => slots
+    .map((id) => (id ? state.generals[id] : null))
+    .filter((g): g is NonNullable<typeof g> => g !== null), [slots, state.generals]);
+  const forecast = useMemo(() => createBattleForecast(state, regionId, placedGenerals), [state, regionId, placedGenerals]);
+  const firstBattle = !hasBattleHistory(state);
+  const terrainNote = region ? TERRAIN_BONUSES[region.terrain]?.note ?? region.terrain : '';
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  useEffect(() => {
+    if (!firstBattle || slots.some(Boolean) || roster.length === 0) return;
+    const ids = roster.slice(0, 3).map((g) => g.id);
+    setSlots([ids[0] ?? null, ids[1] ?? null, ids[2] ?? null]);
+  }, [firstBattle, roster, slots]);
 
   function handleRosterClick(id: GeneralId) {
     audio.play('tap');
@@ -114,17 +128,6 @@ export function BattlePlacementScreen({ state, regionId, onConfirm, onCancel }: 
   }
 
   const placedCount = slots.filter(Boolean).length;
-  const placedGenerals = slots
-    .map((id) => (id ? state.generals[id] : null))
-    .filter((g): g is NonNullable<typeof g> => Boolean(g));
-  const allyTroops = placedGenerals.reduce((sum, g) => sum + g.troopCurrent, 0);
-  const enemyTroops = enemyPreview.reduce((sum, g) => sum + g.troopCurrent, 0);
-  const allyForce = placedGenerals.reduce((sum, g) => sum + forceValue(g), 0);
-  const enemyForce = enemyPreview.reduce((sum, g) => sum + forceValue(g), 0);
-  const forceRatio = enemyForce > 0 ? allyForce / enemyForce : 2;
-  const forceLabel = forceRatio >= 1.18 ? '有利' : forceRatio <= 0.88 ? '不利' : '互角';
-  const forceClass = forceRatio >= 1.18 ? 'good' : forceRatio <= 0.88 ? 'bad' : 'even';
-  const terrainNote = region ? TERRAIN_BONUSES[region.terrain]?.note : '';
 
   return (
     <div className="placementScreen">
@@ -138,26 +141,38 @@ export function BattlePlacementScreen({ state, regionId, onConfirm, onCancel }: 
           <span className="value">{enemyFid ? FACTION_NAME[enemyFid] : '無主'}</span>
         </div>
         <div className="placementHudGroup">
-          <span className="label">地形</span>
-          <span className="value" style={{ fontSize: 12 }}>
-            {terrainNote || region?.terrain || ''}
+            <span className="label">地形</span>
+            <span className="value" style={{ fontSize: 12 }}>
+            {terrainNote}
           </span>
         </div>
       </header>
 
-      <section className="placementIntel">
-        <div>
-          <span className="intelLabel">味方総兵力</span>
-          <span className="intelValue">{allyTroops.toLocaleString()}</span>
+      <section className="placementForecast">
+        <div className="forecastCard available">
+          <span className="forecastLabel">出陣可能戦力</span>
+          <strong>{availableStats.troopTotal.toLocaleString()}</strong>
+          <small>合計戦力 {availableStats.combatPower.toLocaleString()} / {availableStats.generalCount}名</small>
         </div>
-        <div>
-          <span className="intelLabel">敵総兵力</span>
-          <span className="intelValue">{enemyTroops.toLocaleString()}</span>
+        <div className="forecastCard">
+          <span className="forecastLabel">配置中の味方</span>
+          <strong>{forecast.player.troopTotal.toLocaleString()}</strong>
+          <small>敵兵数 {forecast.enemy.troopTotal.toLocaleString()}</small>
         </div>
-        <div className={`forceEval ${forceClass}`}>
-          <span className="intelLabel">戦力評価</span>
-          <span className="intelValue">{forceLabel}</span>
+        <div className={`forecastCard ${RATING_CLASS[forecast.rating]}`}>
+          <span className="forecastLabel">戦力評価</span>
+          <strong>{RATING_LABEL[forecast.rating]}</strong>
+          <small>勝率目安 {forecast.winRate}%</small>
         </div>
+        <div className="forecastReason">
+          <b>地形補正</b> {forecast.terrainNote}<br />
+          <b>{forecast.rating === 'disadvantage' ? '主な敗因' : '主な勝因'}</b> {forecast.mainReason}
+        </div>
+        {forecast.rating === 'disadvantage' && (
+          <div className="forecastWarning">
+            この地域は序盤の戦力では危険です。先に探索・徴収・弱い地域への進軍をおすすめします。
+          </div>
+        )}
       </section>
 
       <div className="placementBody">
@@ -193,7 +208,7 @@ export function BattlePlacementScreen({ state, regionId, onConfirm, onCancel }: 
           </div>
 
           <div className="placementButtons">
-            <button className="phantBtn" onClick={handleAutoFill}>強い順で自動配置</button>
+            <button className="phantBtn autoFill" onClick={handleAutoFill}>強い順で自動配置</button>
             <button className="phantBtn" onClick={handleClear}>全クリア</button>
           </div>
         </section>

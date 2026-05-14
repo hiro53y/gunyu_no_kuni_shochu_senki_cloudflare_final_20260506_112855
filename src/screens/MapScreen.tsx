@@ -22,6 +22,7 @@ import {
   attemptPersuade, hireRonin,
   initBattle, finalizeBattle, createRng,
 } from '../engine';
+import { hasBattleHistory } from '../engine/battleIntel';
 import { applyScoutAction, applyRestAction, endTurn, consumeAp } from '../createGame';
 import { audio } from '../audio/AudioManager';
 
@@ -90,7 +91,7 @@ export function MapScreen({ state, setState, onReturnTitle }: Props) {
 
     setState((s) => ({ ...s, ap: Math.max(0, s.ap - 1) }));
 
-    const battle = initBattle(state, {
+    const baseBattle = initBattle(state, {
       regionId: pendingBattleRegion,
       playerIsAttacker: true,
       attackerFactionId: 'akatsuki',
@@ -98,6 +99,17 @@ export function MapScreen({ state, setState, onReturnTitle }: Props) {
       playerGeneralIds: playerSlots,
       enemyGeneralIds: enemySlots,
     });
+    const isFirstBattle = !hasBattleHistory(state);
+    const battle = isFirstBattle ? {
+      ...baseBattle,
+      enemySlots: baseBattle.enemySlots.map((slot) => slot.generalId
+        ? { ...slot, hp: Math.max(1, Math.round(slot.hp * 0.85)), hpMax: Math.max(1, Math.round(slot.hpMax * 0.85)) }
+        : slot),
+      log: [
+        ...baseBattle.log,
+        { turn: 0, message: '初陣補正：敵兵数が15%低下し、味方は落ち着いて布陣した' },
+      ],
+    } : baseBattle;
     setActiveBattle(battle);
     setPendingBattleRegion(null);
   }, [state, setState, pendingBattleRegion]);
@@ -110,7 +122,18 @@ export function MapScreen({ state, setState, onReturnTitle }: Props) {
     setState((s) => {
       const rng = createRng(s.rngSeed);
       const fin = finalizeBattle(s, finalBattle, rng);
-      return fin.state;
+      return {
+        ...fin.state,
+        log: [
+          ...fin.state.log,
+          {
+            turn: fin.state.turn,
+            actor: 'player',
+            type: 'battle',
+            message: `${s.regions[finalBattle.regionId]?.name ?? '合戦'}：${finalBattle.result === 'player_win' ? '勝利' : finalBattle.result === 'enemy_win' ? '敗北' : '引分'}`,
+          },
+        ],
+      };
     });
     const messageMap: Record<string, string> = {
       player_win: '合戦に勝利！',

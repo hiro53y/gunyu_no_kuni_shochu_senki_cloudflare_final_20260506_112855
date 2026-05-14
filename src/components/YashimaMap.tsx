@@ -7,6 +7,7 @@
 import { useMemo } from 'react';
 import type { GameState, RegionId, FactionId, Terrain } from '../types/game';
 import { REGION_TEMPLATES } from '../data/regions';
+import { createBattleForecast, getDeployableGenerals } from '../engine/battleIntel';
 
 interface Props {
   state: GameState;
@@ -116,6 +117,7 @@ function roadPath(ax: number, ay: number, bx: number, by: number, seed: number):
 }
 
 export function YashimaMap({ state, selectedId, onSelect }: Props) {
+  const deployable = useMemo(() => getDeployableGenerals(state).slice(0, 3), [state]);
   const templateById = useMemo(() => new Map(REGION_TEMPLATES.map((r) => [r.id, r])), []);
   const playerRegions = useMemo(
     () => new Set(Object.values(state.regions).filter((r) => r.factionId === 'akatsuki').map((r) => r.id)),
@@ -219,6 +221,14 @@ export function YashimaMap({ state, selectedId, onSelect }: Props) {
           const isSelected = selectedId === tmpl.id;
           const adjacent = selectedAdj.has(tmpl.id);
           const attackable = isAttackable(tmpl.id);
+          const forecast = attackable ? createBattleForecast(state, tmpl.id, deployable) : null;
+          const riskClass = forecast?.recommendation === 'high'
+            ? 'risk-low'
+            : forecast?.recommendation === 'medium'
+              ? 'risk-mid'
+              : forecast?.recommendation === 'low'
+                ? 'risk-high'
+                : '';
           const isHome = fid && HOME_REGION[fid] === tmpl.id;
           const isPlayerHome = isHome && fid === 'akatsuki';
           const isEnemyHome = isHome && fid !== 'akatsuki';
@@ -238,6 +248,7 @@ export function YashimaMap({ state, selectedId, onSelect }: Props) {
                 isSelected && 'selected',
                 adjacent && 'adjacent',
                 attackable && 'attackable',
+                riskClass,
                 isPlayerHome && 'playerHome',
                 isEnemyHome && 'enemyHome',
               ].filter(Boolean).join(' ')}

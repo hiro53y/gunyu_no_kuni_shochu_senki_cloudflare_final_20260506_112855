@@ -1688,6 +1688,211 @@
 .formGaugeValues span:last-child { color: var(--c-shu); }
 
 /* =========================================================================
+   序盤合戦の納得感改善（2026-05-15）
+   ========================================================================= */
+.placementScreen { grid-template-rows: auto auto 1fr auto auto; }
+.placementForecast {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.18);
+  border-bottom: 1px solid var(--c-sumi-line);
+}
+.forecastCard,
+.forecastReason,
+.forecastWarning {
+  background: var(--c-sumi-light);
+  border: 1px solid var(--c-sumi-line);
+  border-radius: var(--radius-s);
+  padding: 8px;
+}
+.forecastCard { display: flex; flex-direction: column; gap: 2px; min-height: 70px; }
+.forecastCard.available { border-color: rgba(201, 162, 74, 0.45); }
+.forecastCard.good { border-color: #6FB17C; }
+.forecastCard.warn { border-color: #E9C75A; }
+.forecastCard.bad { border-color: var(--c-shu); }
+.forecastLabel { color: var(--c-kinari-d); font-size: 10px; }
+.forecastCard strong { color: var(--c-kogane); font-family: var(--font-mincho); font-size: 22px; line-height: 1.1; }
+.forecastCard.good strong { color: #6FB17C; }
+.forecastCard.warn strong { color: #E9C75A; }
+.forecastCard.bad strong { color: var(--c-shu); }
+.forecastCard small,
+.forecastReason,
+.forecastWarning { color: var(--c-kinari-d); font-size: 11px; line-height: 1.5; }
+.forecastReason { grid-column: 1 / -1; }
+.forecastReason b { color: var(--c-kogane); font-weight: 500; }
+.forecastWarning {
+  grid-column: 1 / -1;
+  color: var(--c-kinari);
+  border-color: var(--c-shu);
+  background: rgba(140, 40, 40, 0.18);
+}
+.phantBtn.autoFill {
+  background: linear-gradient(180deg, rgba(201, 162, 74, 0.28), rgba(140, 80, 47, 0.18));
+  border-color: var(--c-kogane);
+  color: var(--c-kogane);
+  box-shadow: 0 0 0 1px rgba(201, 162, 74, 0.22);
+}
+.battleScreen { grid-template-rows: auto auto 1fr auto auto; }
+.battleHudGroup.advantage.good .value,
+.battleInfoStrip .good,
+.formGaugeAdvantage.good { color: #6FB17C; }
+.battleHudGroup.advantage.warn .value,
+.battleInfoStrip .warn,
+.formGaugeAdvantage.warn { color: #E9C75A; }
+.battleHudGroup.advantage.bad .value,
+.battleInfoStrip .bad,
+.formGaugeAdvantage.bad { color: var(--c-shu); }
+.battleInfoStrip {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 5px 10px;
+  background: rgba(20, 17, 15, 0.82);
+  border-bottom: 1px solid var(--c-sumi-line);
+  color: var(--c-kinari-d);
+  font-size: 11px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.battleInfoStrip strong { color: var(--c-kinari); font-weight: 500; }
+.formGaugeAdvantage {
+  font-family: var(--font-fude);
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-align: center;
+}
+.formGaugeReason {
+  max-width: 92px;
+  font-size: 9px;
+  line-height: 1.35;
+  color: var(--c-kinari-d);
+  text-align: center;
+}
+.battleLog .logLine { display: flex; gap: 6px; align-items: baseline; }
+.battleLog .logIcon {
+  flex: 0 0 auto;
+  min-width: 18px;
+  text-align: center;
+  border: 1px solid var(--c-sumi-line);
+  color: var(--c-kinari-d);
+  font-size: 9px;
+}
+.battleLog .logLine.skill .logIcon,
+.summaryLogLine.skill { color: var(--c-kogane); }
+.battleLog .logLine.damage .logIcon,
+.summaryLogLine.damage { color: #E27F4A; }
+.battleLog .logLine.retreat .logIcon,
+.summaryLogLine.retreat { color: var(--c-shu); }
+.battleLog .logLine.defeat .logIcon,
+.summaryLogLine.defeat { color: var(--c-shu-d); }
+.statusBadge.normal {
+  width: auto;
+  padding: 0 3px;
+  color: var(--c-kinari-d);
+  border-color: var(--c-sumi-line);
+}
+.defeatSummary {
+  margin-bottom: 10px;
+  padding: 10px;
+  background: rgba(90, 24, 24, 0.28);
+  border: 1px solid var(--c-shu-d);
+  border-radius: var(--radius-s);
+  color: var(--c-kinari);
+  line-height: 1.6;
+}
+.defeatSummary h3 {
+  margin: 0 0 4px;
+  color: var(--c-kogane);
+  font-family: var(--font-fude);
+  font-size: 14px;
+  letter-spacing: 2px;
+}
+.defeatSummary h3:not(:first-child) { margin-top: 8px; }
+.surrenderModalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.68);
+}
+.surrenderModal {
+  width: min(420px, 92vw);
+  background: linear-gradient(180deg, rgba(31, 25, 20, 0.98), rgba(14, 10, 8, 0.98));
+  border: 1px solid var(--c-kogane);
+  border-radius: var(--radius-m);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  padding: 22px;
+  color: var(--c-kinari);
+}
+.surrenderModal h2 {
+  margin: 0 0 12px;
+  font-family: var(--font-fude);
+  color: var(--c-kogane);
+  letter-spacing: 4px;
+  font-size: 22px;
+}
+.surrenderModal p { margin: 0 0 18px; line-height: 1.7; color: var(--c-kinari-d); }
+.surrenderActions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.surrenderActions button {
+  min-height: 46px;
+  background: var(--c-sumi-light);
+  border: 1px solid var(--c-kinari-d);
+  border-radius: var(--radius-s);
+  color: var(--c-kinari);
+  font-family: var(--font-fude);
+  letter-spacing: 2px;
+  font-size: 14px;
+}
+.surrenderActions button.danger { background: var(--c-shu); border-color: var(--c-shu); }
+.regionRecommendation {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  border: 1px solid var(--c-sumi-line);
+  border-radius: var(--radius-s);
+  background: rgba(0, 0, 0, 0.22);
+}
+.regionRecommendation span { color: var(--c-kogane); font-family: var(--font-fude); letter-spacing: 2px; }
+.regionRecommendation small { color: var(--c-kinari-d); line-height: 1.5; }
+.regionRecommendation.high { border-color: #6FB17C; }
+.regionRecommendation.medium { border-color: #E9C75A; }
+.regionRecommendation.low { border-color: var(--c-shu); }
+.popupRecommendation { margin-top: 4px; font-size: 11px; line-height: 1.4; }
+.popupRecommendation.high { color: #6FB17C; }
+.popupRecommendation.medium { color: #E9C75A; }
+.popupRecommendation.low { color: var(--c-shu); }
+.mapNode.playerHome .nodeBanner {
+  stroke: var(--c-kogane);
+  stroke-width: 1.6;
+  filter: drop-shadow(0 0 7px rgba(201, 162, 74, 0.7));
+}
+.mapNode.attackable .nodeBanner { animation: attackablePulse 1.6s ease-in-out infinite; }
+.mapNode.risk-low .nodeBanner { stroke: #6FB17C; }
+.mapNode.risk-mid .nodeBanner { stroke: #E9C75A; }
+.mapNode.risk-high .nodeBanner { stroke: var(--c-shu); }
+@keyframes attackablePulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.35) drop-shadow(0 0 5px currentColor); }
+}
+@media (max-width: 600px) {
+  .placementForecast { grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px; }
+  .forecastCard { min-height: 62px; padding: 7px; }
+  .forecastCard strong { font-size: 18px; }
+  .forecastReason,
+  .forecastWarning,
+  .battleInfoStrip { font-size: 10px; }
+  .formGaugeReason { display: none; }
+  .surrenderActions { grid-template-columns: 1fr; }
+}
+
+/* =========================================================================
    2026-05-13 UI精査: スマホ可読性・合戦説明・バー寸法
    ========================================================================= */
 
