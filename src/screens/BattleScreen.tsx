@@ -17,6 +17,7 @@ import {
 import { getSkill } from '../data/skills';
 import { audio } from '../audio/AudioManager';
 import { summarizeSlots } from '../engine/battleIntel';
+import type { Skill, SkillKind, SkillTarget } from '../types/game';
 
 interface Props {
   state: GameState;
@@ -45,6 +46,7 @@ export function BattleScreen({ state, initialBattle, onComplete }: Props) {
   const [cutIn, setCutIn] = useState<CutInData | null>(null);
   const [selectedTarget, setSelectedTarget] = useState<number | null>(null);
   const [pendingSkillId, setPendingSkillId] = useState<string | null>(null);
+  const [focusedSkillId, setFocusedSkillId] = useState<string | null>(null);
   const [phaseLabel, setPhaseLabel] = useState<string>('合戦開始');
   const [showSurrenderModal, setShowSurrenderModal] = useState(false);
 
@@ -158,6 +160,15 @@ export function BattleScreen({ state, initialBattle, onComplete }: Props) {
     const g = state.generals[slot.generalId];
     return getDefaultPlayerActions(g);
   }, [activeActor, battle, state]);
+  const activeGeneral = useMemo(() => {
+    if (!activeActor || activeActor.side !== 'player') return null;
+    const slot = battle.playerSlots[activeActor.index];
+    return slot.generalId ? state.generals[slot.generalId] ?? null : null;
+  }, [activeActor, battle.playerSlots, state.generals]);
+  const focusedSkill = useMemo(() => {
+    const id = focusedSkillId ?? playerActions[0]?.id ?? 'sk_zangeki';
+    return getSkill(id);
+  }, [focusedSkillId, playerActions]);
 
   function executePlayerSkill(skillId: string, targetIndex: number | null) {
     if (!activeActor) return;
@@ -166,6 +177,7 @@ export function BattleScreen({ state, initialBattle, onComplete }: Props) {
     const skill = getSkill(skillId);
     setPendingSkillId(null);
     setSelectedTarget(null);
+    setFocusedSkillId(skillId);
 
     const proceed = () => {
       const after = playerExecuteAction(battle, state, activeActor, skillId, targetIndex, rngRef.current);
@@ -204,6 +216,7 @@ export function BattleScreen({ state, initialBattle, onComplete }: Props) {
       }
       // 複数いる → ターゲット選択待ち
       setPendingSkillId(skillId);
+      setFocusedSkillId(skillId);
       setPhaseLabel('攻撃する相手を選択');
       return;
     }
@@ -289,6 +302,13 @@ export function BattleScreen({ state, initialBattle, onComplete }: Props) {
         <span className={battleIntel.className}>戦況：{battleIntel.label}</span>
         <strong>{battleIntel.reason}</strong>
       </section>
+      {activeGeneral && (
+        <section className="activeTurnStrip">
+          <span className="label">手番</span>
+          <strong>{activeGeneral.name}</strong>
+          <span>兵{battle.playerSlots[activeActor?.index ?? 0]?.hp.toLocaleString()} / 守{battle.playerSlots[activeActor?.index ?? 0]?.guard}%</span>
+        </section>
+      )}
 
       {/* 中央：3×3スロット */}
       <div className="battleField">
@@ -353,17 +373,16 @@ export function BattleScreen({ state, initialBattle, onComplete }: Props) {
           <div className="actionLabel">行動を選択</div>
           <div className="actionRow">
             {playerActions.map((a) => (
-              <button
+              <SkillActionButton
                 key={a.id}
-                className="actionBtn"
-                onClick={() => handleSkillClick(a.id)}
-                disabled={pendingSkillId !== null}
-              >
-                <span className="actionName">{a.name}</span>
-                {a.cost > 0 && <span className="actionCost">気{a.cost}</span>}
-              </button>
+                skill={getSkill(a.id)}
+                disabledReason={getSkillUnavailableReason(getSkill(a.id), battle, pendingSkillId)}
+                onFocusSkill={() => setFocusedSkillId(a.id)}
+                onUse={() => handleSkillClick(a.id)}
+              />
             ))}
           </div>
+          <SkillDetailPanel skill={focusedSkill} disabledReason={getSkillUnavailableReason(focusedSkill, battle, pendingSkillId)} />
           {pendingSkillId && (
             <div className="actionHint">
               攻撃する相手を選んでください
@@ -433,6 +452,89 @@ export function BattleScreen({ state, initialBattle, onComplete }: Props) {
 }
 
 // --- 補助コンポーネント ----------------------------------------------------
+
+function SkillActionButton({
+  skill,
+  disabledReason,
+  onFocusSkill,
+  onUse,
+}: {
+  skill: Skill;
+  disabledReason: string | null;
+  onFocusSkill: () => void;
+  onUse: () => void;
+}) {
+  const disabled = disabledReason !== null;
+  return (
+    <button
+      className="actionBtn"
+      onClick={onUse}
+      onFocus={onFocusSkill}
+      onPointerEnter={onFocusSkill}
+      disabled={disabled}
+      title={disabledReason ?? skill.description}
+    >
+      <span className="actionName">{skill.name === '通常斬撃' ? '通常攻撃' : skill.name}</span>
+      <span className="actionMeta">
+        {skill.cost > 0 ? `気${skill.cost}` : '気0'} / {skillKindLabel(skill.kind)}
+      </span>
+      <span className="actionDesc">{shortSkillText(skill)}</span>
+      {disabledReason && <span className="actionReason">{disabledReason}</span>}
+    </button>
+  );
+}
+
+function SkillDetailPanel({ skill, disabledReason }: { skill: Skill; disabledReason: string | null }) {
+  return (
+    <div className="skillDetailPanel">
+      <div>
+        <span className="skillType">{skillKindLabel(skill.kind)}</span>
+        <strong>{skill.name === '通常斬撃' ? '通常攻撃' : skill.name}</strong>
+        <span>気{skill.cost}</span>
+      </div>
+      <p>{skill.description}</p>
+      <small>対象：{skillTargetLabel(skill.target)}{disabledReason ? ` / 使用不可：${disabledReason}` : ''}</small>
+    </div>
+  );
+}
+
+function getSkillUnavailableReason(skill: Skill, battle: BattleState, pendingSkillId: string | null): string | null {
+  if (pendingSkillId && pendingSkillId !== skill.id) return '対象選択中';
+  if ((skill.target === 'enemy_one' || skill.target === 'enemy_all') &&
+      !battle.enemySlots.some((s) => s.generalId && !s.retreated && s.hp > 0)) {
+    return '対象なし';
+  }
+  if ((skill.target === 'ally_one' || skill.target === 'ally_all') &&
+      !battle.playerSlots.some((s) => s.generalId && !s.retreated && s.hp > 0)) {
+    return '対象なし';
+  }
+  return null;
+}
+
+function skillKindLabel(kind: SkillKind): string {
+  return {
+    attack: '攻撃',
+    aoe: '攻撃',
+    support: '強化/弱体',
+    heal: '回復',
+    special: '特殊',
+  }[kind];
+}
+
+function skillTargetLabel(target: SkillTarget): string {
+  return {
+    enemy_one: '敵単体',
+    enemy_all: '敵全体',
+    ally_one: '味方単体',
+    ally_all: '味方全体',
+    self: '自分',
+  }[target];
+}
+
+function shortSkillText(skill: Skill): string {
+  const text = skill.description.replace(/。$/, '');
+  return text.length > 18 ? `${text.slice(0, 18)}…` : text;
+}
 
 function FormationGauge({ battle, reason, label, className }: { battle: BattleState; reason: string; label: string; className: string }) {
   const playerHp = battle.playerSlots.reduce((s, x) => s + x.hp, 0);

@@ -44,14 +44,22 @@ export function ResultOverlay({ state, onReturnTitle }: Props) {
       .filter((g) => g.status === 'free' || g.status === 'recruited')
       .sort((a, b) => (b.troopCurrent + b.stats.power * 5) - (a.troopCurrent + a.stats.power * 5))[0];
 
-    return { playerRegions, destroyedFactions, recruited, captured, killed, mvp };
+    const mvpReason = mvp
+      ? `残兵${mvp.troopCurrent.toLocaleString()}と武力${mvp.stats.power}を基準に選定`
+      : '';
+    return { playerRegions, destroyedFactions, recruited, captured, killed, mvp, mvpReason };
   }, [state]);
+  const resultReason = state.defeatReason ?? defaultResultReason(state);
+  const scoreNote = state.score === 0
+    ? '得点0：支配地域・撃破勢力・登用武将による加点がまだありません。'
+    : '';
 
   return (
     <div className="modalBackdrop resultBackdrop" role="dialog" aria-modal="true">
       <div className="resultBox">
         <div className={`resultTitle ${state.victory}`}>{title}</div>
         <div className="resultSubtitle">{subtitle}</div>
+        {resultReason && <div className="resultReason">{resultReason}</div>}
 
         <div className="resultStatsGrid">
           <ResultStat label="到達ターン" value={`${state.turn}`} />
@@ -72,10 +80,12 @@ export function ResultOverlay({ state, onReturnTitle }: Props) {
                 <div className="resultMvpStats">
                   武{stats.mvp.stats.power} 統{stats.mvp.stats.command} 兵{stats.mvp.troopCurrent.toLocaleString()}
                 </div>
+                <div className="resultMvpReason">{stats.mvpReason}</div>
               </div>
             </div>
           </section>
         )}
+        {scoreNote && <div className="scoreNote">{scoreNote}</div>}
 
         <button className={`resultBtn ${isWin ? 'win' : 'lose'}`} onClick={onReturnTitle}>
           タイトルへ
@@ -83,6 +93,14 @@ export function ResultOverlay({ state, onReturnTitle }: Props) {
       </div>
     </div>
   );
+}
+
+function defaultResultReason(state: GameState): string {
+  if (state.victory === 'lose_zero') return '支配地域が0になったため敗北';
+  if (state.victory === 'lose_timeout') return '期限までに目標支配地域へ届かなかったため敗北';
+  if (state.victory === 'win_dominate') return '12地域以上を支配したため勝利';
+  if (state.victory === 'win_youma') return '妖魔勢力を討伐したため勝利';
+  return '';
 }
 
 function ResultStat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {

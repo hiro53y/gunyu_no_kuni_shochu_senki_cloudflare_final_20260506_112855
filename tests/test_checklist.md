@@ -10,11 +10,13 @@
 - [x] 壊れたセーブデータを拒否する
 - [x] 勝利条件を判定できる
 - [x] 25ターンのスモーク進行で状態が壊れない
+- [x] 序盤5ターンで支配地域が不自然に0にならない
 - [x] 出陣前の戦力予測が危険度と勝率を返す
 - [x] 調略とAP消費が現在APIで動く
+- [x] 武将portraitKeyが既存画像に紐づいている
 
 ## build
-- [ ] 公開用コピーで `npm run build`（2026-05-15: `tsc -b` 通過後、Vite/esbuild `spawn EPERM` で停止）
+- [ ] 公開用コピーで `npm run build`（2026-05-16: `tsc -b` 通過後、Vite/esbuild `spawn EPERM` で停止）
 - [x] 検証用deliverables内で `npm run build`
 - [x] Cloudflare検証用deliverables内で `npm run build`
 
@@ -47,5 +49,5 @@
 - [x] NPC侵攻がプレイヤー絡みでも作戦記に出ることを自動テストで確認
 - [x] CharacterPortrait追加後も全武将表示の型チェックが通過
 - [x] 1ターン目終了で即敗北しないことを自動テストで確認
-- [x] `npm test` は10件通過
+- [x] `npm test` は13件通過
 - [ ] `npm run build` は TypeScript 後の Vite/esbuild 実行ファイル起動が `spawn EPERM` で停止。Cloudflare Pages/通常PC環境で再確認する

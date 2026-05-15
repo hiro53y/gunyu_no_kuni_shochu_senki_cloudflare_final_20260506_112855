@@ -22,7 +22,7 @@ export function GeneralPortrait({ general, size = 64, showLabel = true, selected
   useEffect(() => {
     setStage('png');
     setLoaded(false);
-  }, [general.portraitKey]);
+  }, [general.id, general.portraitKey]);
 
   if (stage === 'fallback') {
     return <CharacterPortrait general={general} size={size} showLabel={showLabel} selected={selected} />;
@@ -36,17 +36,22 @@ export function GeneralPortrait({ general, size = 64, showLabel = true, selected
     >
       <CharacterPortrait general={general} size={size} showLabel={false} selected={selected} />
       <img
-        key={`${general.portraitKey}-${stage}`}
+        key={`${general.id}-${general.portraitKey}-${stage}`}
         src={portraitUrl(general.portraitKey, stage)}
         alt={general.name}
         width={size}
         height={h}
+        loading="eager"
+        decoding="async"
         onLoad={() => setLoaded(true)}
         onError={() => {
           if (stage === 'png') {
             setStage('jpg');
             setLoaded(false);
           } else {
+            if (import.meta.env.DEV) {
+              console.warn(`[portrait] ${general.name} (${general.id}) の画像が見つかりません: ${general.portraitKey}`);
+            }
             setStage('fallback');
           }
         }}

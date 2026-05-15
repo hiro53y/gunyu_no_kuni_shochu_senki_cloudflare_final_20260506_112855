@@ -665,6 +665,51 @@
 .actionBtn:disabled { opacity: 0.3; }
 .actionName { font-size: 13px; }
 .actionCost { font-size: 9px; color: var(--c-kogane); }
+.actionMeta {
+  font-family: var(--font-mincho);
+  font-size: 9px;
+  letter-spacing: 0;
+  color: var(--c-kogane);
+}
+.actionDesc,
+.actionReason {
+  font-family: var(--font-mincho);
+  font-size: 10px;
+  line-height: 1.25;
+  letter-spacing: 0;
+  color: var(--c-kinari-d);
+  text-align: center;
+}
+.actionReason { color: var(--c-shu); }
+.skillDetailPanel {
+  border: 1px solid rgba(201, 162, 74, 0.34);
+  background: rgba(10, 8, 7, 0.74);
+  padding: 7px 9px;
+  border-radius: 4px;
+  font-family: var(--font-mincho);
+  color: var(--c-kinari);
+}
+.skillDetailPanel > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.skillDetailPanel p {
+  margin: 4px 0 2px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.skillDetailPanel small {
+  color: var(--c-kinari-d);
+  font-size: 10px;
+}
+.skillType {
+  color: #1A1008;
+  background: var(--c-kogane);
+  border-radius: 2px;
+  padding: 1px 5px;
+  font-size: 10px;
+}
 .actionHelp {
   display: block;
   font-family: var(--font-mincho);
@@ -679,6 +724,19 @@
   font-family: var(--font-mincho);
   font-style: italic;
   text-align: center;
+}
+.activeTurnStrip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-bottom: 1px solid rgba(201, 162, 74, 0.22);
+  background: rgba(255, 214, 110, 0.06);
+  font-family: var(--font-mincho);
+  font-size: 11px;
+}
+.activeTurnStrip .label {
+  color: var(--c-kogane);
 }
 
 .battleResultOverlay {
@@ -1077,6 +1135,21 @@
   color: var(--c-kinari); margin-bottom: 8px;
   letter-spacing: 2px;
 }
+.resultReason,
+.scoreNote {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(201, 162, 74, 0.28);
+  background: rgba(0, 0, 0, 0.24);
+  color: var(--c-kinari);
+  font-family: var(--font-mincho);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+}
+.scoreNote {
+  color: var(--c-kinari-d);
+}
 .resultStatsGrid {
   width: 100%;
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
@@ -1110,6 +1183,7 @@
 .resultMvpBody { display: flex; gap: 12px; align-items: center; }
 .resultMvpName { font-size: 16px; color: var(--c-kinari); }
 .resultMvpStats { font-size: 11px; color: var(--c-kinari-d); margin-top: 2px; }
+.resultMvpReason { font-size: 10px; color: var(--c-kogane); margin-top: 4px; }
 
 .resultBtn {
   margin-top: 8px; padding: 12px 40px;
@@ -1555,8 +1629,11 @@
 .actionRow { gap: 4px; }
 .actionBtn {
   font-size: 12px;
-  padding: 8px 6px;
+  padding: 7px 5px;
   min-width: 60px;
+}
+.actionDesc {
+  font-size: 9px;
 }
 
 /* タイトル画面の safe-area */
@@ -2138,20 +2215,20 @@
 .strategyRoad {
   fill: none;
   stroke: rgba(118, 91, 55, 0.78);
-  stroke-width: 1.15;
+  stroke-width: 0.72;
   stroke-linecap: round;
-  stroke-dasharray: 0.9 1.35;
-  opacity: 0.8;
+  stroke-dasharray: 0.7 1.6;
+  opacity: 0.46;
   filter: url(#ink-wobble);
   pointer-events: none;
 }
 .strategyRoad::selection { background: transparent; }
 .strategyRoad.selected {
   stroke: url(#road-grad);
-  stroke-width: 1.75;
+  stroke-width: 1.1;
   stroke-dasharray: none;
-  opacity: 1;
-  filter: drop-shadow(0 0 4px rgba(201, 162, 74, 0.62));
+  opacity: 0.72;
+  filter: drop-shadow(0 0 2px rgba(201, 162, 74, 0.46));
 }
 .mapNode {
   opacity: 0;
@@ -2177,16 +2254,16 @@
   animation: homePulse 1.8s ease-in-out infinite;
 }
 .enemyHome .homeAura {
-  stroke: rgba(190, 50, 52, 0.82);
-  animation: enemyPulse 2.2s ease-in-out infinite;
+  stroke: rgba(190, 50, 52, 0.46);
+  animation: enemyPulse 2.6s ease-in-out infinite;
 }
 @keyframes homePulse {
   0%, 100% { opacity: 0.45; transform: scale(0.96); }
   50% { opacity: 0.95; transform: scale(1.06); }
 }
 @keyframes enemyPulse {
-  0%, 100% { opacity: 0.32; transform: scale(0.98); }
-  50% { opacity: 0.82; transform: scale(1.08); }
+  0%, 100% { opacity: 0.18; transform: scale(0.98); }
+  50% { opacity: 0.46; transform: scale(1.05); }
 }
 .nodeBanner {
   fill: rgba(34, 28, 22, 0.95);
@@ -2207,9 +2284,17 @@
   stroke: rgba(255, 214, 110, 0.92);
   animation: attackableGlow 1.7s ease-in-out infinite;
 }
+.mapNode.unreachable {
+  opacity: 0.46;
+  filter: saturate(0.55);
+}
+.mapNode.reachable:not(.selected) .nodeBanner {
+  stroke: rgba(255, 214, 110, 0.9);
+  stroke-width: 0.85;
+}
 .mapNode.selected .nodeBanner {
   stroke: #FFD66E;
-  stroke-width: 1.1;
+  stroke-width: 1.28;
   filter:
     drop-shadow(0 0 3px rgba(255, 214, 110, 0.95))
     drop-shadow(0 6px 8px rgba(0, 0, 0, 0.72));
@@ -2218,8 +2303,16 @@
   stroke: rgba(232, 190, 92, 0.68);
 }
 @keyframes attackableGlow {
-  0%, 100% { filter: drop-shadow(0 0 1px rgba(255, 214, 110, 0.36)); }
-  50% { filter: drop-shadow(0 0 5px rgba(255, 214, 110, 0.72)); }
+  0%, 100% { filter: drop-shadow(0 0 1px rgba(255, 214, 110, 0.24)); }
+  50% { filter: drop-shadow(0 0 3px rgba(255, 214, 110, 0.58)); }
+}
+.selectedBeacon {
+  fill: none;
+  stroke: rgba(255, 214, 110, 0.9);
+  stroke-width: 0.55;
+  stroke-dasharray: 1.5 0.9;
+  pointer-events: none;
+  filter: url(#marker-glow);
 }
 .nodeInnerLine {
   stroke: rgba(255, 232, 170, 0.28);

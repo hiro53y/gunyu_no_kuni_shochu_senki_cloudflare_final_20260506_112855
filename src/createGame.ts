@@ -76,6 +76,45 @@ export function checkVictory(state: GameState): GameState['victory'] {
   return 'none';
 }
 
+function countPlayerRegions(state: GameState): number {
+  return Object.values(state.regions).filter((r) => r.factionId === 'akatsuki').length;
+}
+
+function victoryReason(state: GameState, victory: GameState['victory']): string | undefined {
+  if (victory === 'lose_zero') return '支配地域が0になったため敗北';
+  if (victory === 'lose_timeout') return '期限までに目標支配地域へ届かなかったため敗北';
+  if (victory === 'win_dominate') return '12地域以上を支配したため勝利';
+  if (victory === 'win_youma') return '妖魔勢力を討伐したため勝利';
+  return state.defeatReason;
+}
+
+function isDevRuntime(): boolean {
+  return typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.search.includes('debugTurn=1')
+  );
+}
+
+function debugTurn(label: string, state: GameState): void {
+  if (!isDevRuntime()) return;
+  const playerRegionIds = Object.values(state.regions)
+    .filter((r) => r.factionId === 'akatsuki')
+    .map((r) => r.id);
+  console.debug('[turn-debug]', {
+    label,
+    turn: state.turn,
+    playerRegions: playerRegionIds.length,
+    playerRegionIds,
+    gold: state.factions.akatsuki.treasury,
+    food: state.factions.akatsuki.food,
+    satisfaction: state.satisfaction,
+    homeRegion: '01',
+    homeOwner: state.regions['01']?.factionId,
+    victory: state.victory,
+  });
+}
+
 /** 月の進行 */
 function nextYearMonth(ym: { year: number; month: number }): { year: number; month: number } {
   if (ym.month >= 12) return { year: ym.year + 1, month: 1 };
@@ -86,6 +125,8 @@ function nextYearMonth(ym: { year: number; month: number }): { year: number; mon
 export function endTurn(state: GameState): GameState {
   const rng = createRng(state.rngSeed);
   let next = state;
+  debugTurn('turn-start', next);
+  const regionsAtStart = countPlayerRegions(next);
 
   // 1. 経済処理
   next = applyEconomyTick(next);
@@ -110,13 +151,24 @@ export function endTurn(state: GameState): GameState {
   }
 
   // 5. NPC勢力の行動
+  debugTurn('before-npc', next);
   next = runNpcTurn(next, rng);
+  debugTurn('after-npc', next);
 
   // 6. 浪人プール補充
   next = refillRoninPool(next, rng);
 
   // 7. 勝敗判定
   const victory = checkVictory(next);
+  if (victory !== 'none' && isDevRuntime()) {
+    console.debug('[turn-debug]', {
+      label: 'victory-check',
+      condition: victory,
+      reason: victoryReason(next, victory),
+      playerRegionsBeforeTurn: regionsAtStart,
+      playerRegionsAfterNpc: countPlayerRegions(next),
+    });
+  }
 
   // 8. ターンと月の進行
   next = {
@@ -127,6 +179,7 @@ export function endTurn(state: GameState): GameState {
     score: computeScore(next),
     rngSeed: rng.getSeed(),
     victory,
+    defeatReason: victoryReason(next, victory),
   };
 
   // 9. 自動セーブ（勝敗確定時はセーブしない）

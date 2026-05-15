@@ -25,6 +25,7 @@ class AudioManager {
   private bgmSource: AudioBufferSourceNode | null = null;
   private bgmOscillators: OscillatorNode[] = [];
   private currentBgmKey: string | null = null;
+  private requestedBgmKey: 'title' | 'map' | 'battle' | 'defeat' | null = null;
 
   /** 設定で持っている音量（0〜1）。AudioContext が無くても保持できる */
   private sfxVolume = 0.7;
@@ -50,10 +51,21 @@ class AudioManager {
   }
 
   /** AudioContext がブラウザでサスペンドされていたら resume を試みる */
-  private resume(): void {
+  private async resume(): Promise<void> {
     if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume().catch(() => {/* ignore */});
+      await this.ctx.resume().catch(() => {/* ignore */});
     }
+  }
+
+  /** ユーザー操作後に呼び、直近で要求されたBGMを確実に再開する */
+  unlock(): void {
+    if (!this.ensure()) return;
+    this.resume().finally(() => {
+      if (!this.requestedBgmKey) return;
+      const key = this.requestedBgmKey;
+      this.stopBgm();
+      this.playBgm(key).catch(() => {/* ignore */});
+    });
   }
 
   setVolumes(sfx: number, bgm: number): void {
@@ -66,7 +78,7 @@ class AudioManager {
   /** 主要 SFX */
   play(kind: SfxKind): void {
     if (!this.ensure() || !this.ctx || !this.gainSfx) return;
-    this.resume();
+    this.resume().catch(() => {/* ignore */});
     if (this.sfxVolume <= 0) return;
 
     switch (kind) {
@@ -191,12 +203,14 @@ class AudioManager {
   // --- BGM（ファイルがあれば読み込んでループ。無ければ無音） ---------------
 
   async playBgm(key: 'title' | 'map' | 'battle' | 'defeat'): Promise<void> {
+    this.requestedBgmKey = key;
     if (!this.ensure() || !this.ctx || !this.gainBgm) return;
-    this.resume();
+    await this.resume();
     if (this.currentBgmKey === key) return;
     this.stopBgm();
 
-    const url = `/assets/sounds/bgm/${key}.mp3`;
+    const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+    const url = `${base}/assets/sounds/bgm/${key}.mp3`;
     try {
       const resp = await fetch(url);
       if (!resp.ok) {

@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { createNewGame, checkVictory, endTurn, applyRestAction, applyScoutAction, consumeAp } from '../src/createGame';
 import {
   applyBuildAction,
@@ -157,6 +159,16 @@ function run(): void {
     assert.ok(Object.keys(state.generals).length >= 22);
   });
 
+  test('序盤5ターンで支配地域が不自然に0にならない', () => {
+    let state = createNewGame(110);
+    for (let index = 0; index < 5; index += 1) {
+      state = endTurn(state);
+      const playerRegions = Object.values(state.regions).filter((r) => r.factionId === 'akatsuki').length;
+      assert.ok(playerRegions >= 1);
+      assert.equal(state.victory, 'none');
+    }
+  });
+
   test('出陣前の戦力予測が危険度と勝率を返す', () => {
     const state = createNewGame(12);
     const forecast = createBattleForecast(state, '03', getDeployableGenerals(state).slice(0, 3));
@@ -174,6 +186,15 @@ function run(): void {
     assert.equal(consumed.ok, true);
     assert.equal(consumed.state.ap, 2);
     assert.equal(scouted.ok, true);
+  });
+
+  test('武将portraitKeyが既存画像に紐づいている', () => {
+    const state = createNewGame(14);
+    const missing = Object.values(state.generals)
+      .map((g) => ({ name: g.name, key: g.portraitKey }))
+      .filter(({ key }) => !existsSync(join(process.cwd(), 'public', 'assets', 'portraits', `${key}.png`)));
+
+    assert.deepEqual(missing, []);
   });
 
   report();

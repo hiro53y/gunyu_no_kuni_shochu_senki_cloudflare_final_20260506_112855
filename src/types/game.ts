@@ -314,6 +314,8 @@ export interface GameState {
   rngSeed: number;
   config: GameConfig;
   victory: VictoryStatus;
+  /** 敗北/勝利画面で表示する具体理由 */
+  defeatReason?: string;
   /** 自動セーブ用のメタ */
   meta: {
     createdAt: string;

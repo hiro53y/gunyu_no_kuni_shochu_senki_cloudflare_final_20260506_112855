@@ -125,6 +125,17 @@ export function YashimaMap({ state, selectedId, onSelect }: Props) {
   );
   const selectedRegion = selectedId ? state.regions[selectedId] : null;
   const selectedAdj = useMemo(() => new Set(selectedRegion?.adjacentIds ?? []), [selectedRegion]);
+  const reachableRegions = useMemo(() => {
+    const ids = new Set<RegionId>();
+    for (const region of Object.values(state.regions)) {
+      if (region.factionId !== 'akatsuki') continue;
+      for (const adjacentId of region.adjacentIds) {
+        const adjacent = state.regions[adjacentId];
+        if (adjacent && adjacent.factionId !== 'akatsuki') ids.add(adjacent.id);
+      }
+    }
+    return ids;
+  }, [state.regions]);
 
   const adjacencyPairs = useMemo(() => {
     const pairs: Array<[string, string]> = [];
@@ -221,6 +232,7 @@ export function YashimaMap({ state, selectedId, onSelect }: Props) {
           const isSelected = selectedId === tmpl.id;
           const adjacent = selectedAdj.has(tmpl.id);
           const attackable = isAttackable(tmpl.id);
+          const reachable = reachableRegions.has(tmpl.id);
           const forecast = attackable ? createBattleForecast(state, tmpl.id, deployable) : null;
           const riskClass = forecast?.recommendation === 'high'
             ? 'risk-low'
@@ -237,6 +249,12 @@ export function YashimaMap({ state, selectedId, onSelect }: Props) {
           const width = tmpl.name.length >= 4 ? 15 : 13.2;
           const height = 10.5;
           const danger = fid && fid !== 'akatsuki' ? Math.min(9, region.power + (attackable ? 2 : 0)) : region.power;
+          const isDimmed = !isSelected && fid !== 'akatsuki' && !reachable;
+          const infoLabel = fid === 'akatsuki'
+            ? `${TERRAIN_LABEL[region.terrain]} / 自領`
+            : reachable
+              ? `${TERRAIN_LABEL[region.terrain]} / 進軍可`
+              : `${TERRAIN_LABEL[region.terrain]} / 危${danger}`;
 
           return (
             <g
@@ -248,6 +266,8 @@ export function YashimaMap({ state, selectedId, onSelect }: Props) {
                 isSelected && 'selected',
                 adjacent && 'adjacent',
                 attackable && 'attackable',
+                reachable && 'reachable',
+                isDimmed && 'unreachable',
                 riskClass,
                 isPlayerHome && 'playerHome',
                 isEnemyHome && 'enemyHome',
@@ -270,11 +290,10 @@ export function YashimaMap({ state, selectedId, onSelect }: Props) {
                     Q ${-width / 2 - 1} ${height / 2 - 1} ${-width / 2} ${height / 2 - 3} Z`}
               />
               <path className="nodeInnerLine" d={`M ${-width / 2 + 1.4} ${1.1} L ${width / 2 - 1.4} ${1.1}`} />
+              {isSelected && <circle className="selectedBeacon" cx="0" cy="0" r={width * 0.72} />}
               {terrainIcon(region.terrain, 0, -0.2)}
               <text className="nodeName" x="0" y="-1.8">{tmpl.name}</text>
-              <text className="nodeInfo" x="0" y="4.4">
-                {TERRAIN_LABEL[region.terrain]} / {fid === 'akatsuki' ? `収${region.power}` : `危${danger}`}
-              </text>
+              <text className="nodeInfo" x="0" y="4.4">{infoLabel}</text>
               {attackable && <path className="attackRune" d={`M ${width / 2 - 3} ${-height / 2 + 1} L ${width / 2 - 0.6} ${-height / 2 + 3.4} L ${width / 2 - 3} ${-height / 2 + 5.8}`} />}
               {region.scoutProgress.akatsuki ? (
                 <circle className="scoutDot" cx={width / 2 - 1.6} cy={height / 2 - 1.5} r="1.1" />

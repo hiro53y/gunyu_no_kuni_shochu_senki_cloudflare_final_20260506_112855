@@ -64,6 +64,7 @@ export default function App() {
   // 初回ユーザー操作で AudioContext を起動するための workaround
   useEffect(() => {
     const init = () => {
+      audio.unlock();
       audio.play('tap');
       window.removeEventListener('pointerdown', init);
       window.removeEventListener('keydown', init);
