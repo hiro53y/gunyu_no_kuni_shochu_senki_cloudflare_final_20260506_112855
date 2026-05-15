@@ -14,6 +14,10 @@
 - 追加デバッグで、BGM再生をWeb Audioデコード依存からHTMLAudio優先へ変更。初回タップ後に停止中のBGMを再試行し、失敗時だけ合成BGMへフォールバックする。
 - 既存セーブデータの古い/不正な `portraitKey` をロード時に現行画像キーへ補正する処理を追加。
 - Service Workerを `gunyu-no-kuni-v4` に更新し、立ち絵とBGMはnetwork-firstで取得するよう修正。
+- スマホ追加デバッグとして、画像/BGMのURLへ `APP_ASSET_VERSION` クエリを付け、スマホ側の古い404/古い音声キャッシュを回避。
+- モバイル音声制限に合わせ、初回だけでなく各タップ/キー入力で直近BGMを再開する処理へ変更。
+- Service Worker登録を `updateViaCache: 'none'` に変更し、`sw.js?v=...` で更新を取りに行くよう修正。`sw.js` は `gunyu-no-kuni-v5-mobile-assets`。
+- `_headers` で `assets/portraits` と `assets/sounds` を `max-age=0, must-revalidate` に変更。
 
 ## 2026-05-16 検証
 - `npx tsc --noEmit -p tsconfig.json` 成功

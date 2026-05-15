@@ -61,18 +61,20 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state?.config]);
 
-  // 初回ユーザー操作で AudioContext を起動するための workaround
+  // モバイルブラウザではBGM再生が「その場のユーザー操作」に縛られるため、
+  // 初回だけでなく各タップ/キー入力で直近BGMの再開を試す。
   useEffect(() => {
     const init = () => {
       audio.unlock();
-      audio.play('tap');
-      window.removeEventListener('pointerdown', init);
-      window.removeEventListener('keydown', init);
     };
-    window.addEventListener('pointerdown', init, { once: true });
-    window.addEventListener('keydown', init, { once: true });
+    window.addEventListener('pointerdown', init, { passive: true });
+    window.addEventListener('touchend', init, { passive: true });
+    window.addEventListener('click', init);
+    window.addEventListener('keydown', init);
     return () => {
       window.removeEventListener('pointerdown', init);
+      window.removeEventListener('touchend', init);
+      window.removeEventListener('click', init);
       window.removeEventListener('keydown', init);
     };
   }, []);

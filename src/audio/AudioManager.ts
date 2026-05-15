@@ -5,6 +5,8 @@
 // 将来 BGM ファイルを /assets/sounds/bgm/ に置けば差し替え可能。
 // ===========================================================================
 
+import { APP_ASSET_VERSION } from '../appVersion';
+
 export type SfxKind =
   | 'click'      // UIボタン
   | 'tap'        // 軽いタップ
@@ -62,12 +64,11 @@ class AudioManager {
   /** ユーザー操作後に呼び、直近で要求されたBGMを確実に再開する */
   unlock(): void {
     this.unlocked = true;
-    if (!this.ensure()) return;
-    this.resume().finally(() => {
-      if (!this.requestedBgmKey) return;
-      const key = this.requestedBgmKey;
-      this.playBgm(key).catch(() => {/* ignore */});
-    });
+    this.ensure();
+    this.resume().catch(() => {/* ignore */});
+    if (this.requestedBgmKey) {
+      this.playBgm(this.requestedBgmKey).catch(() => {/* ignore */});
+    }
   }
 
   setVolumes(sfx: number, bgm: number): void {
@@ -80,6 +81,10 @@ class AudioManager {
 
   /** 主要 SFX */
   play(kind: SfxKind): void {
+    this.unlocked = true;
+    if (this.requestedBgmKey) {
+      this.playBgm(this.requestedBgmKey).catch(() => {/* ignore */});
+    }
     if (!this.ensure() || !this.ctx || !this.gainSfx) return;
     this.resume().catch(() => {/* ignore */});
     if (this.sfxVolume <= 0) return;
@@ -265,7 +270,9 @@ class AudioManager {
   private assetUrl(path: string): string {
     const base = import.meta.env.BASE_URL || '/';
     const normalizedBase = base.endsWith('/') ? base : `${base}/`;
-    return new URL(path.replace(/^\//, ''), new URL(normalizedBase, window.location.origin)).toString();
+    const url = new URL(path.replace(/^\//, ''), new URL(normalizedBase, window.location.origin));
+    url.searchParams.set('v', APP_ASSET_VERSION);
+    return url.toString();
   }
 
   private playGeneratedBgm(key: 'title' | 'map' | 'battle' | 'defeat'): void {

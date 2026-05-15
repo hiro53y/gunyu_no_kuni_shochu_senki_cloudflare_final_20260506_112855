@@ -4,7 +4,7 @@
 // - その他 GET リクエストは cache-first（バンドルアセット等）
 // - 失敗レスポンス（4xx/5xx）はキャッシュしない
 
-const CACHE_NAME = 'gunyu-no-kuni-v4';
+const CACHE_NAME = 'gunyu-no-kuni-v5-mobile-assets';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg'];
 
 self.addEventListener('install', (event) => {
@@ -21,7 +21,9 @@ self.addEventListener('activate', (event) => {
     caches
       .keys()
       .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
-      .then(() => self.clients.claim()),
+      .then(() => self.clients.claim())
+      .then(() => self.clients.matchAll({ type: 'window' }))
+      .then((clients) => clients.forEach((client) => client.postMessage({ type: 'SW_UPDATED', cacheName: CACHE_NAME }))),
   );
 });
 
@@ -36,7 +38,7 @@ self.addEventListener('fetch', (event) => {
 
   const requestUrl = new URL(event.request.url);
 
-  // 立ち絵とBGMは network-first（新規追加・差替が即反映されるように）
+  // 立ち絵とBGMは常に network-first（スマホ側の古い失敗キャッシュを避ける）
   if (requestUrl.pathname.startsWith('/assets/portraits/') ||
       requestUrl.pathname.startsWith('/assets/sounds/')) {
     event.respondWith(
@@ -69,6 +71,11 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => caches.match(event.request).then((cached) => cached || caches.match('/index.html'))),
     );
+    return;
+  }
+
+  if (requestUrl.pathname.startsWith('/assets/') && requestUrl.pathname.includes('/index-')) {
+    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
     return;
   }
 
