@@ -11,10 +11,14 @@
 - 合戦ログは技名だけでなく説明、損害後の残兵、回復後の兵数が読める形へ修正。味方全体強化スキルは対象全体へ効果が乗るよう補正。
 - 序盤にNPCがプレイヤー最後の1地域を奪って即敗北する流れを抑止し、敗北/勝利理由を `GameState.defeatReason` と結果画面に表示。
 - 武将画像は `portraitKey` とキャラIDで再読み込みを安定化し、画像が見つからない場合のみフォールバック、開発時ログで対象キャラを出す。
+- 追加デバッグで、BGM再生をWeb Audioデコード依存からHTMLAudio優先へ変更。初回タップ後に停止中のBGMを再試行し、失敗時だけ合成BGMへフォールバックする。
+- 既存セーブデータの古い/不正な `portraitKey` をロード時に現行画像キーへ補正する処理を追加。
+- Service Workerを `gunyu-no-kuni-v4` に更新し、立ち絵とBGMはnetwork-firstで取得するよう修正。
 
 ## 2026-05-16 検証
 - `npx tsc --noEmit -p tsconfig.json` 成功
-- `npm run test` 成功（13 tests passed）
+- `npm run test` 成功（14 tests passed）
+- ローカル配信で `title.mp3`、`akatsuki_saku.png`、`generic_normal.png` がHTTP 200で取得できることを確認
 - `npm run build` は `tsc -b` 通過後、Vite/esbuild の `spawn EPERM` で停止。OneDrive/Windows子プロセス制限の環境差分として継続。
 
 ## 2026-05-15 更新内容

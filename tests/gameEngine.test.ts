@@ -197,6 +197,21 @@ function run(): void {
     assert.deepEqual(missing, []);
   });
 
+  test('古いセーブのportraitKeyを現行画像キーへ補正する', () => {
+    const state = createNewGame(15);
+    const broken = {
+      ...state,
+      generals: {
+        ...state.generals,
+        g_kazama_saku: { ...state.generals.g_kazama_saku, portraitKey: 'old_saku' },
+      },
+    };
+    const loaded = deserializeSaveData(serializeGameState(broken));
+
+    assert.equal(loaded.ok, true);
+    assert.equal(loaded.state?.generals.g_kazama_saku.portraitKey, 'akatsuki_saku');
+  });
+
   report();
 }
 

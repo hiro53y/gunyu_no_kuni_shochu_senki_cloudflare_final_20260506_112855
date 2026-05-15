@@ -24,8 +24,10 @@ class AudioManager {
   private gainBgm: GainNode | null = null;
   private bgmSource: AudioBufferSourceNode | null = null;
   private bgmOscillators: OscillatorNode[] = [];
+  private bgmAudio: HTMLAudioElement | null = null;
   private currentBgmKey: string | null = null;
   private requestedBgmKey: 'title' | 'map' | 'battle' | 'defeat' | null = null;
+  private unlocked = false;
 
   /** 設定で持っている音量（0〜1）。AudioContext が無くても保持できる */
   private sfxVolume = 0.7;
@@ -59,11 +61,11 @@ class AudioManager {
 
   /** ユーザー操作後に呼び、直近で要求されたBGMを確実に再開する */
   unlock(): void {
+    this.unlocked = true;
     if (!this.ensure()) return;
     this.resume().finally(() => {
       if (!this.requestedBgmKey) return;
       const key = this.requestedBgmKey;
-      this.stopBgm();
       this.playBgm(key).catch(() => {/* ignore */});
     });
   }
@@ -73,6 +75,7 @@ class AudioManager {
     this.bgmVolume = Math.max(0, Math.min(1, bgm));
     if (this.gainSfx) this.gainSfx.gain.value = this.sfxVolume;
     if (this.gainBgm) this.gainBgm.gain.value = this.bgmVolume;
+    if (this.bgmAudio) this.bgmAudio.volume = this.bgmVolume;
   }
 
   /** 主要 SFX */
@@ -200,34 +203,37 @@ class AudioManager {
     o.stop(t + 0.5);
   }
 
-  // --- BGM（ファイルがあれば読み込んでループ。無ければ無音） ---------------
+  // --- BGM（音声ファイルを優先。失敗時のみWeb Audio合成BGM） ---------------
 
   async playBgm(key: 'title' | 'map' | 'battle' | 'defeat'): Promise<void> {
     this.requestedBgmKey = key;
-    if (!this.ensure() || !this.ctx || !this.gainBgm) return;
-    await this.resume();
-    if (this.currentBgmKey === key) return;
+    if (this.currentBgmKey === key) {
+      if (this.bgmAudio && this.bgmAudio.paused && this.unlocked) {
+        await this.bgmAudio.play().catch(() => {
+          this.stopBgm();
+          this.playGeneratedBgm(key);
+        });
+      }
+      return;
+    }
     this.stopBgm();
 
-    const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-    const url = `${base}/assets/sounds/bgm/${key}.mp3`;
+    const url = this.assetUrl(`/assets/sounds/bgm/${key}.mp3`);
+    const audio = new Audio(url);
+    audio.loop = true;
+    audio.preload = 'auto';
+    audio.volume = this.bgmVolume;
+    audio.crossOrigin = 'anonymous';
+    this.bgmAudio = audio;
+    this.currentBgmKey = key;
+
     try {
-      const resp = await fetch(url);
-      if (!resp.ok) {
-        this.playGeneratedBgm(key);
-        return;
-      }
-      const data = await resp.arrayBuffer();
-      const buffer = await this.ctx.decodeAudioData(data);
-      const src = this.ctx.createBufferSource();
-      src.buffer = buffer;
-      src.loop = true;
-      src.connect(this.gainBgm);
-      src.start();
-      this.bgmSource = src;
-      this.currentBgmKey = key;
+      await audio.play();
     } catch {
-      this.playGeneratedBgm(key);
+      if (this.unlocked) {
+        this.stopHtmlBgm();
+        this.playGeneratedBgm(key);
+      }
     }
   }
 
@@ -237,12 +243,29 @@ class AudioManager {
       this.bgmSource.disconnect();
       this.bgmSource = null;
     }
+    this.stopHtmlBgm();
     for (const osc of this.bgmOscillators) {
       try { osc.stop(); } catch { /* ignore */ }
       osc.disconnect();
     }
     this.bgmOscillators = [];
     this.currentBgmKey = null;
+  }
+
+  private stopHtmlBgm(): void {
+    if (!this.bgmAudio) return;
+    try {
+      this.bgmAudio.pause();
+      this.bgmAudio.src = '';
+      this.bgmAudio.load();
+    } catch { /* ignore */ }
+    this.bgmAudio = null;
+  }
+
+  private assetUrl(path: string): string {
+    const base = import.meta.env.BASE_URL || '/';
+    const normalizedBase = base.endsWith('/') ? base : `${base}/`;
+    return new URL(path.replace(/^\//, ''), new URL(normalizedBase, window.location.origin)).toString();
   }
 
   private playGeneratedBgm(key: 'title' | 'map' | 'battle' | 'defeat'): void {

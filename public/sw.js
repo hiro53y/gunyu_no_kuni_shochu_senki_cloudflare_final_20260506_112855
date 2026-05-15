@@ -4,7 +4,7 @@
 // - その他 GET リクエストは cache-first（バンドルアセット等）
 // - 失敗レスポンス（4xx/5xx）はキャッシュしない
 
-const CACHE_NAME = 'gunyu-no-kuni-v3';
+const CACHE_NAME = 'gunyu-no-kuni-v4';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg'];
 
 self.addEventListener('install', (event) => {
@@ -36,8 +36,9 @@ self.addEventListener('fetch', (event) => {
 
   const requestUrl = new URL(event.request.url);
 
-  // 立ち絵は network-first（新規追加・差替が即反映されるように）
-  if (requestUrl.pathname.startsWith('/assets/portraits/')) {
+  // 立ち絵とBGMは network-first（新規追加・差替が即反映されるように）
+  if (requestUrl.pathname.startsWith('/assets/portraits/') ||
+      requestUrl.pathname.startsWith('/assets/sounds/')) {
     event.respondWith(
       fetch(event.request)
         .then((response) => {

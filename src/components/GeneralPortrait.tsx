@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { General } from '../types/game';
 import { CharacterPortrait } from './CharacterPortrait';
+import { normalizePortraitKey, portraitUrl } from './portraitUtils';
 
 interface Props {
   general: General;
@@ -9,20 +10,16 @@ interface Props {
   selected?: boolean;
 }
 
-function portraitUrl(key: string, ext: 'png' | 'jpg'): string {
-  const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-  return `${base}/assets/portraits/${key}.${ext}`;
-}
-
 export function GeneralPortrait({ general, size = 64, showLabel = true, selected = false }: Props) {
   const [stage, setStage] = useState<'png' | 'jpg' | 'fallback'>('png');
   const [loaded, setLoaded] = useState(false);
   const h = Math.round(size * 1.25);
+  const imageKey = normalizePortraitKey(general);
 
   useEffect(() => {
     setStage('png');
     setLoaded(false);
-  }, [general.id, general.portraitKey]);
+  }, [general.id, imageKey]);
 
   if (stage === 'fallback') {
     return <CharacterPortrait general={general} size={size} showLabel={showLabel} selected={selected} />;
@@ -36,8 +33,8 @@ export function GeneralPortrait({ general, size = 64, showLabel = true, selected
     >
       <CharacterPortrait general={general} size={size} showLabel={false} selected={selected} />
       <img
-        key={`${general.id}-${general.portraitKey}-${stage}`}
-        src={portraitUrl(general.portraitKey, stage)}
+        key={`${general.id}-${imageKey}-${stage}`}
+        src={portraitUrl(imageKey, stage)}
         alt={general.name}
         width={size}
         height={h}

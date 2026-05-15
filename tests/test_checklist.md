@@ -14,6 +14,7 @@
 - [x] 出陣前の戦力予測が危険度と勝率を返す
 - [x] 調略とAP消費が現在APIで動く
 - [x] 武将portraitKeyが既存画像に紐づいている
+- [x] 古いセーブのportraitKeyを現行画像キーへ補正する
 
 ## build
 - [ ] 公開用コピーで `npm run build`（2026-05-16: `tsc -b` 通過後、Vite/esbuild `spawn EPERM` で停止）
@@ -49,5 +50,5 @@
 - [x] NPC侵攻がプレイヤー絡みでも作戦記に出ることを自動テストで確認
 - [x] CharacterPortrait追加後も全武将表示の型チェックが通過
 - [x] 1ターン目終了で即敗北しないことを自動テストで確認
-- [x] `npm test` は13件通過
+- [x] `npm test` は14件通過
 - [ ] `npm run build` は TypeScript 後の Vite/esbuild 実行ファイル起動が `spawn EPERM` で停止。Cloudflare Pages/通常PC環境で再確認する

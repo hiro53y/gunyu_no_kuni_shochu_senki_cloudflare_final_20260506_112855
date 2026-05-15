@@ -10,7 +10,8 @@ createRoot(document.getElementById('root') as HTMLElement).render(
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {
+    const swUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/sw.js`;
+    navigator.serviceWorker.register(swUrl).catch(() => {
       // PWA登録に失敗してもゲーム本体は継続する
     });
   });
