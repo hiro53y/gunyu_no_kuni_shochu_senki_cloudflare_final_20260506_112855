@@ -157,6 +157,9 @@ export function RegionPopup({ state, regionId }: Props) {
     ? createBattleForecast(state, regionId, getDeployableGenerals(state).slice(0, 3))
     : null;
   const recLabel = forecast?.recommendation === 'high' ? '高' : forecast?.recommendation === 'medium' ? '中' : forecast?.recommendation === 'low' ? '低' : null;
+  const generalsHere = Object.values(state.generals).filter(
+    (g) => g.factionId === region.factionId && (g.status === 'free' || g.status === 'recruited'),
+  );
 
   return (
     <div className="regionPopup">
@@ -172,6 +175,27 @@ export function RegionPopup({ state, regionId }: Props) {
           おすすめ度：{recLabel}　{forecast.recommendationReason}
         </div>
       )}
+      <div className="mobileRegionGenerals">
+        <div className="mobileRegionGeneralsTitle">所属武将（{generalsHere.length}）</div>
+        {generalsHere.length === 0 ? (
+          <div className="mobileNoGenerals">武将なし</div>
+        ) : (
+          <div className="mobileGeneralList">
+            {generalsHere.slice(0, 4).map((g) => (
+              <div className="mobileGeneralChip" key={g.id}>
+                <GeneralPortrait general={g} size={30} showLabel={false} />
+                <div>
+                  <span>{g.isUnique && '★'}{g.name}</span>
+                  <small>武{g.stats.power} 統{g.stats.command} 兵{g.troopCurrent}</small>
+                </div>
+              </div>
+            ))}
+            {generalsHere.length > 4 && (
+              <div className="mobileMoreGenerals">他{generalsHere.length - 4}名</div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

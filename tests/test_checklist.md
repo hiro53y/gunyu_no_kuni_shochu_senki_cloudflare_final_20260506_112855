@@ -58,5 +58,7 @@
 - [x] `npx tsc --noEmit -p tsconfig.json` がエラーなし
 - [x] `npm run test` は15件通過
 - [x] `npm run dev -- --host 127.0.0.1` のローカルHTTP 200を確認
+- [x] スマホ作戦記表示、地域選択時の所属武将表示、斬撃/被弾SE追加後も `npx tsc --noEmit -p tsconfig.json` がエラーなし
+- [x] スマホ作戦記表示、地域選択時の所属武将表示、斬撃/被弾SE追加後も `npm run test` は15件通過
 - [ ] `npm run build` は `tsc -b` 通過後、Vite/esbuild `spawn EPERM` で停止。OneDrive/Windows子プロセス制限のためCloudflare Pages/通常PC環境で再確認する
 - [ ] ブラウザスクリーンショット確認はBrowserツールが今回ロードできず未実施

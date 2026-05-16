@@ -2802,3 +2802,93 @@
   from { opacity: 0; transform: translate(-50%, -8px); }
   to { opacity: 1; transform: translate(-50%, 0); }
 }
+
+/* 2026-05-16: スマホ縦でもPC同様に作戦記と所属武将を表示 */
+@media (max-width: 899px) and (orientation: portrait) {
+  .mapBody {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto minmax(0, 1fr) !important;
+  }
+  .mapBody .opList {
+    display: flex !important;
+    grid-row: 1;
+    min-height: 0;
+    max-height: 118px;
+    border-right: none;
+    border-bottom: 1px solid rgba(201, 162, 74, 0.35);
+    background:
+      linear-gradient(90deg, rgba(201, 162, 74, 0.06), transparent 54%),
+      rgba(24, 18, 14, 0.96);
+    overflow-y: auto;
+  }
+  .mapBody .opList .opTitle {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 7px 12px;
+    background: rgba(24, 18, 14, 0.98);
+    font-size: 13px;
+  }
+  .mapBody .opList .opEntry {
+    padding: 6px 12px;
+    font-size: 11px;
+    line-height: 1.35;
+  }
+  .mapBody .opList .opEntry:nth-of-type(n+6) {
+    display: none;
+  }
+  .mapArea {
+    grid-row: 2;
+  }
+  .mobileRegionGenerals {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--c-sumi-line);
+  }
+  .mobileRegionGeneralsTitle {
+    color: var(--c-kogane);
+    font-family: var(--font-fude);
+    font-size: 12px;
+    letter-spacing: 2px;
+    margin-bottom: 6px;
+  }
+  .mobileGeneralList {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .mobileGeneralChip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 5px;
+    background: rgba(0, 0, 0, 0.22);
+    border: 1px solid var(--c-sumi-line);
+    border-radius: var(--radius-s);
+  }
+  .mobileGeneralChip > div {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .mobileGeneralChip span {
+    color: var(--c-kinari);
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mobileGeneralChip small,
+  .mobileNoGenerals,
+  .mobileMoreGenerals {
+    color: var(--c-kinari-d);
+    font-size: 10px;
+  }
+  .mobileMoreGenerals {
+    display: flex;
+    align-items: center;
+    padding-left: 4px;
+  }
+}

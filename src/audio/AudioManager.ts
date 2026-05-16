@@ -11,6 +11,8 @@ export type SfxKind =
   | 'click'      // UIボタン
   | 'tap'        // 軽いタップ
   | 'attack'     // 通常攻撃ヒット
+  | 'slash'      // 斬撃の振り音
+  | 'hit'        // 被弾音
   | 'skill'      // 必殺技発動
   | 'heal'       // 回復
   | 'turnEnd'    // ターン終了
@@ -94,6 +96,8 @@ class AudioManager {
       case 'tap':     return this.playClick(800, 0.03, 0.04);
       case 'fail':    return this.playClick(220, 0.12, 0.10);
       case 'attack':  return this.playNoiseBurst(0.18, 1800);
+      case 'slash':   return this.playSlash();
+      case 'hit':     return this.playHit();
       case 'skill':   return this.playChord([523, 659, 784], 0.4);
       case 'heal':    return this.playChord([523, 659, 880, 1046], 0.6, true);
       case 'turnEnd': return this.playGong(220, 0.6);
@@ -102,6 +106,47 @@ class AudioManager {
       case 'levelUp': return this.playArpeggio([523, 659, 784, 1046, 1318], 0.08, 'asc');
       case 'cutIn':   return this.playCutIn();
     }
+  }
+
+  /** 刀を振る短い風切り音 */
+  private playSlash(): void {
+    if (!this.ctx || !this.gainSfx) return;
+    const t = this.ctx.currentTime;
+    const buffer = this.ctx.createBuffer(1, Math.floor(this.ctx.sampleRate * 0.12), this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      const p = i / data.length;
+      data[i] = (Math.random() * 2 - 1) * Math.sin(p * Math.PI) * 0.8;
+    }
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffer;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(3200, t);
+    filter.frequency.exponentialRampToValueAtTime(920, t + 0.12);
+    filter.Q.value = 1.6;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.22, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+    src.connect(filter).connect(g).connect(this.gainSfx);
+    src.start(t);
+  }
+
+  /** 鎧に当たる低めの被弾音 */
+  private playHit(): void {
+    if (!this.ctx || !this.gainSfx) return;
+    this.playNoiseBurst(0.11, 760);
+    const t = this.ctx.currentTime;
+    const o = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(150, t);
+    o.frequency.exponentialRampToValueAtTime(86, t + 0.13);
+    g.gain.setValueAtTime(0.16, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+    o.connect(g).connect(this.gainSfx);
+    o.start(t);
+    o.stop(t + 0.18);
   }
 
   /** 短い矩形波クリック */

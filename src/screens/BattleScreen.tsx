@@ -90,6 +90,7 @@ export function BattleScreen({ state, initialBattle, onComplete }: Props) {
     const proceed = () => {
       const after = aiExecuteAction(currentBattle, state, actor, rngRef.current);
       setCombatFx(createCombatFx(currentBattle, after, actor));
+      playAttackSfx(currentBattle, after, actor);
       setBattle(after);
       setActiveActor(null);
     };
@@ -99,7 +100,7 @@ export function BattleScreen({ state, initialBattle, onComplete }: Props) {
       setCutIn({ general: g, skillName: aiSkill.name, dialogue: aiSkill.cutInDialogue, side: 'enemy' });
       window.setTimeout(proceed, 1700);
     } else {
-      audio.play('attack');
+      audio.play('slash');
       window.setTimeout(proceed, AI_DELAY_MS);
     }
   }, [state]);
@@ -198,6 +199,7 @@ export function BattleScreen({ state, initialBattle, onComplete }: Props) {
     const proceed = () => {
       const after = playerExecuteAction(battle, state, activeActor, skillId, targetIndex, rngRef.current);
       setCombatFx(createCombatFx(battle, after, activeActor));
+      playAttackSfx(battle, after, activeActor);
       setBattle(after);
       setActiveActor(null);
     };
@@ -213,7 +215,7 @@ export function BattleScreen({ state, initialBattle, onComplete }: Props) {
       audio.play('skill');
       window.setTimeout(proceed, 250);
     } else {
-      audio.play('attack');
+      audio.play('slash');
       window.setTimeout(proceed, 250);
     }
   }
@@ -493,6 +495,16 @@ function createCombatFx(before: BattleState, after: BattleState, actor: ActorRef
       .slice(0, 1)
       .map(({ index }) => index),
   };
+}
+
+function playAttackSfx(before: BattleState, after: BattleState, actor: ActorRef): void {
+  const targetSide = actor.side === 'player' ? 'enemy' : 'player';
+  const beforeSlots = targetSide === 'enemy' ? before.enemySlots : before.playerSlots;
+  const afterSlots = targetSide === 'enemy' ? after.enemySlots : after.playerSlots;
+  const damaged = afterSlots.some((slot, index) => slot.hp < (beforeSlots[index]?.hp ?? slot.hp));
+  if (damaged) {
+    audio.play('hit');
+  }
 }
 
 function SkillActionButton({
