@@ -64,6 +64,9 @@ function tryNpcInvasion(state, fid, rng) {
     // 序盤の即死敗北を避ける。世界情勢は動くが、プレイヤー本国への直接侵攻は4ターン目から。
     if (defenderFid === 'akatsuki' && state.turn < 4)
         return state;
+    const playerRegionCount = ownRegions(state, 'akatsuki').length;
+    if (defenderFid === 'akatsuki' && playerRegionCount <= 1 && state.turn < 12)
+        return state;
     const defenderIds = combatRoster(state, defenderFid, 3);
     const battle = (0, battle_1.initBattle)(state, {
         regionId: target.id,
@@ -103,15 +106,27 @@ function tryNpcImprove(state, fid) {
         return state;
     // 国力が低い地域を1つ強化
     const target = own.sort((a, b) => a.power - b.power)[0];
+    const faction = state.factions[fid];
+    const improved = {
+        ...target,
+        power: Math.min(10, target.power + 1),
+        satisfaction: Math.min(100, target.satisfaction + 3),
+    };
     return {
         ...state,
+        log: [
+            {
+                turn: state.turn,
+                actor: fid,
+                type: 'build',
+                targetRegionId: target.id,
+                message: `${faction.name}が${target.name}を整備（国力${target.power}→${improved.power}）`,
+            },
+            ...state.log,
+        ].slice(0, 80),
         regions: {
             ...state.regions,
-            [target.id]: {
-                ...target,
-                power: Math.min(10, target.power + 1),
-                satisfaction: Math.min(100, target.satisfaction + 3),
-            },
+            [target.id]: improved,
         },
     };
 }
@@ -145,7 +160,8 @@ function runNpcTurn(state, rng) {
         for (let i = 0; i < acts; i++) {
             // 性格に応じて侵攻。プレイヤー絡みも自動解決し、世界情勢へ反映する。
             if (rng.chance(aggressionScore(f))) {
-                next = tryNpcInvasion(next, fid, rng);
+                const invaded = tryNpcInvasion(next, fid, rng);
+                next = invaded === next ? tryNpcImprove(next, fid) : invaded;
             }
             else {
                 next = tryNpcImprove(next, fid);

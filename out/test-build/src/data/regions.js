@@ -82,7 +82,7 @@ exports.REGION_TEMPLATES = [
     {
         id: '11', name: '千歳森', reading: 'ちとせのもり',
         terrain: 'forest', product: '薬草',
-        factionId: 'rengein', power: 4,
+        factionId: 'rengein', power: 3,
         adjacentIds: ['01', '08', '12', '13'],
         initSatisfaction: 80, mapX: 32, mapY: 54,
     },

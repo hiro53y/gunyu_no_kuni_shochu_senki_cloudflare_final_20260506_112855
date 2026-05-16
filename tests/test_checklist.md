@@ -11,6 +11,7 @@
 - [x] 勝利条件を判定できる
 - [x] 25ターンのスモーク進行で状態が壊れない
 - [x] 序盤5ターンで支配地域が不自然に0にならない
+- [x] ターン終了時にNPC勢力の行動が作戦記に残る
 - [x] 出陣前の戦力予測が危険度と勝率を返す
 - [x] 調略とAP消費が現在APIで動く
 - [x] 武将portraitKeyが既存画像に紐づいている
@@ -52,3 +53,10 @@
 - [x] 1ターン目終了で即敗北しないことを自動テストで確認
 - [x] `npm test` は14件通過
 - [ ] `npm run build` は TypeScript 後の Vite/esbuild 実行ファイル起動が `spawn EPERM` で停止。Cloudflare Pages/通常PC環境で再確認する
+
+## 2026-05-16 スマホ画面/演出改修確認
+- [x] `npx tsc --noEmit -p tsconfig.json` がエラーなし
+- [x] `npm run test` は15件通過
+- [x] `npm run dev -- --host 127.0.0.1` のローカルHTTP 200を確認
+- [ ] `npm run build` は `tsc -b` 通過後、Vite/esbuild `spawn EPERM` で停止。OneDrive/Windows子プロセス制限のためCloudflare Pages/通常PC環境で再確認する
+- [ ] ブラウザスクリーンショット確認はBrowserツールが今回ロードできず未実施

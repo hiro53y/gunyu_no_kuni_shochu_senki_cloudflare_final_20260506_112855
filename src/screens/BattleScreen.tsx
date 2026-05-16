@@ -35,6 +35,14 @@ interface CutInData {
 const AI_DELAY_MS = 900;
 const TICK_DELAY_MS = 250;
 
+interface CombatFx {
+  key: number;
+  actorSide: 'player' | 'enemy';
+  actorIndex: number;
+  targetSide: 'player' | 'enemy';
+  targetIndices: number[];
+}
+
 export function BattleScreen({ state, initialBattle, onComplete }: Props) {
   // 合戦中は battle BGM
   useEffect(() => {
@@ -49,6 +57,7 @@ export function BattleScreen({ state, initialBattle, onComplete }: Props) {
   const [focusedSkillId, setFocusedSkillId] = useState<string | null>(null);
   const [phaseLabel, setPhaseLabel] = useState<string>('合戦開始');
   const [showSurrenderModal, setShowSurrenderModal] = useState(false);
+  const [combatFx, setCombatFx] = useState<CombatFx | null>(null);
 
   // rng は state.rngSeed を受けて、battle 内部でのみ使う（state は更新しない）
   const rngRef = useRef(createRng(state.rngSeed));
@@ -80,6 +89,7 @@ export function BattleScreen({ state, initialBattle, onComplete }: Props) {
 
     const proceed = () => {
       const after = aiExecuteAction(currentBattle, state, actor, rngRef.current);
+      setCombatFx(createCombatFx(currentBattle, after, actor));
       setBattle(after);
       setActiveActor(null);
     };
@@ -151,6 +161,12 @@ export function BattleScreen({ state, initialBattle, onComplete }: Props) {
     return () => { document.body.style.overflow = ''; };
   }, [showSurrenderModal]);
 
+  useEffect(() => {
+    if (!combatFx) return;
+    const t = window.setTimeout(() => setCombatFx(null), 720);
+    return () => window.clearTimeout(t);
+  }, [combatFx]);
+
   // --- プレイヤー入力 ------------------------------------------------------
 
   const playerActions = useMemo(() => {
@@ -181,6 +197,7 @@ export function BattleScreen({ state, initialBattle, onComplete }: Props) {
 
     const proceed = () => {
       const after = playerExecuteAction(battle, state, activeActor, skillId, targetIndex, rngRef.current);
+      setCombatFx(createCombatFx(battle, after, activeActor));
       setBattle(after);
       setActiveActor(null);
     };
@@ -324,6 +341,8 @@ export function BattleScreen({ state, initialBattle, onComplete }: Props) {
                 isActive={i === playerActiveIdx}
                 isTargetable={false}
                 isSelectedTarget={false}
+                isActing={combatFx?.actorSide === 'player' && combatFx.actorIndex === i}
+                isImpacted={combatFx?.targetSide === 'player' && combatFx.targetIndices.includes(i)}
                 onClick={() => {}}
               />
             ))}
@@ -349,6 +368,8 @@ export function BattleScreen({ state, initialBattle, onComplete }: Props) {
                   isActive={i === enemyActiveIdx}
                   isTargetable={isTargetable}
                   isSelectedTarget={selectedTarget === i}
+                  isActing={combatFx?.actorSide === 'enemy' && combatFx.actorIndex === i}
+                  isImpacted={combatFx?.targetSide === 'enemy' && combatFx.targetIndices.includes(i)}
                   onClick={() => handleEnemyClick(i)}
                 />
               );
@@ -452,6 +473,27 @@ export function BattleScreen({ state, initialBattle, onComplete }: Props) {
 }
 
 // --- 補助コンポーネント ----------------------------------------------------
+
+function createCombatFx(before: BattleState, after: BattleState, actor: ActorRef): CombatFx {
+  const targetSide = actor.side === 'player' ? 'enemy' : 'player';
+  const beforeSlots = targetSide === 'enemy' ? before.enemySlots : before.playerSlots;
+  const afterSlots = targetSide === 'enemy' ? after.enemySlots : after.playerSlots;
+  const damaged = afterSlots
+    .map((slot, index) => ({ index, hp: slot.hp }))
+    .filter(({ index, hp }) => hp < (beforeSlots[index]?.hp ?? hp))
+    .map(({ index }) => index);
+  return {
+    key: Date.now(),
+    actorSide: actor.side,
+    actorIndex: actor.index,
+    targetSide,
+    targetIndices: damaged.length > 0 ? damaged : afterSlots
+      .map((slot, index) => ({ slot, index }))
+      .filter(({ slot }) => slot.generalId && !slot.retreated && slot.hp > 0)
+      .slice(0, 1)
+      .map(({ index }) => index),
+  };
+}
 
 function SkillActionButton({
   skill,

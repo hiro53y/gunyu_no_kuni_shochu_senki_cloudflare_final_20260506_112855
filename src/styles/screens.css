@@ -2212,6 +2212,12 @@
   stroke-width: 0.24;
   filter: url(#ink-wobble);
 }
+.mapLandMass path {
+  fill: rgba(76, 58, 39, 0.24);
+  stroke: rgba(205, 178, 118, 0.22);
+  stroke-width: 0.42;
+  filter: url(#ink-wobble);
+}
 .strategyRoad {
   fill: none;
   stroke: rgba(118, 91, 55, 0.78);
@@ -2440,6 +2446,50 @@
   font-family: var(--font-fude);
   letter-spacing: 1px;
 }
+.battleCard.actingFx {
+  animation: attackerSurge 0.7s ease both;
+}
+.battleCard.impactFx {
+  animation: impactShake 0.7s ease both;
+}
+.battleCard.actingFx::before,
+.battleCard.impactFx::before {
+  content: '';
+  position: absolute;
+  inset: -18%;
+  pointer-events: none;
+  z-index: 1;
+}
+.battleCard.actingFx::before {
+  background: linear-gradient(90deg, transparent, rgba(255, 214, 110, 0.38), transparent);
+  transform: translateX(-80%);
+  animation: slashSweep 0.62s ease both;
+}
+.battleCard.impactFx::before {
+  background: radial-gradient(circle, rgba(255, 85, 58, 0.46), transparent 58%);
+  animation: hitBurst 0.62s ease both;
+}
+@keyframes attackerSurge {
+  0% { transform: translateX(0); }
+  35% { transform: translateX(8px) scale(1.02); }
+  100% { transform: translateX(0); }
+}
+@keyframes impactShake {
+  0%, 100% { transform: translateX(0); filter: none; }
+  18% { transform: translateX(-5px); filter: brightness(1.45); }
+  34% { transform: translateX(4px); }
+  52% { transform: translateX(-2px); }
+}
+@keyframes slashSweep {
+  from { opacity: 0; transform: translateX(-80%) rotate(-10deg); }
+  35% { opacity: 1; }
+  to { opacity: 0; transform: translateX(80%) rotate(-10deg); }
+}
+@keyframes hitBurst {
+  from { opacity: 0; transform: scale(0.45); }
+  30% { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(1.35); }
+}
 .battleCard.selectedTarget::after {
   content: '標的';
   position: absolute;
@@ -2543,9 +2593,10 @@
 
 @media (max-width: 899px) {
   .strategyMap {
-    width: 100%;
-    height: auto;
-    min-height: 0;
+    width: auto !important;
+    height: 100% !important;
+    min-width: 100% !important;
+    max-width: none !important;
   }
   .nodeName {
     font-size: 3.35px;
@@ -2573,4 +2624,181 @@
     width: 76px !important;
     height: 95px !important;
   }
+}
+
+/* 2026-05-16: スマホ横向きはPC同等の三面構成へ寄せる */
+@media (orientation: landscape) and (max-width: 899px) {
+  .mapScreen {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+  .mapBody {
+    grid-template-columns: 190px minmax(0, 1fr) 230px !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+  }
+  .mapBody .opList,
+  .mapBody .regionPanel {
+    display: flex !important;
+  }
+  .mapArea {
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  .regionPopup {
+    display: none !important;
+  }
+  .strategyMap {
+    width: min(100%, 780px) !important;
+    height: 100% !important;
+    min-width: 0 !important;
+  }
+  .hud {
+    flex-wrap: nowrap;
+    min-height: 42px;
+    overflow-x: auto;
+    padding: 4px 8px;
+  }
+  .actionBar {
+    grid-template-columns: repeat(8, 1fr);
+    padding: 6px 8px max(6px, env(safe-area-inset-bottom));
+  }
+  .actionBar button {
+    min-height: 42px;
+  }
+}
+
+/* 2026-05-16: 合戦は3人を横方向にも並べ、スクロール前提にしない */
+@media (min-width: 700px), (orientation: landscape) {
+  .slotGrid {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    align-content: center;
+  }
+  .battleCard.empty {
+    display: block !important;
+    min-height: 0;
+  }
+  .battleField {
+    overflow: hidden;
+  }
+  .battleCard {
+    min-height: 92px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .battleScreen {
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  }
+  .battleHud {
+    min-height: 36px;
+    flex-wrap: nowrap;
+    padding: 3px 8px;
+  }
+  .battleInfoStrip {
+    padding: 3px 8px;
+    font-size: 10px;
+  }
+  .battleField {
+    padding: 5px 8px;
+    gap: 6px;
+  }
+  .sideLabel {
+    padding: 3px 0;
+    margin-bottom: 3px;
+    font-size: 12px;
+  }
+  .battleCard {
+    min-height: 74px;
+    padding: 4px !important;
+  }
+  .battleCard .cardName {
+    font-size: 10px !important;
+  }
+  .battleCard .portrait {
+    width: 38px !important;
+    height: 38px !important;
+  }
+  .battleCard .portrait img,
+  .battleCard .portrait svg {
+    width: 38px !important;
+    height: 38px !important;
+  }
+  .battleLog {
+    max-height: 58px;
+    font-size: 10px !important;
+  }
+  .actionPicker {
+    padding: 5px 8px max(6px, env(safe-area-inset-bottom));
+  }
+  .actionRow {
+    flex-wrap: nowrap;
+  }
+  .actionBtn {
+    min-width: 0;
+    padding: 5px 4px;
+  }
+  .skillDetailPanel {
+    display: none;
+  }
+}
+
+.actionFeedback {
+  position: fixed;
+  left: 50%;
+  top: calc(env(safe-area-inset-top) + 78px);
+  transform: translateX(-50%);
+  z-index: calc(var(--z-toast) + 1);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(430px, calc(100vw - 28px));
+  padding: 12px 14px;
+  color: var(--c-kinari);
+  background:
+    linear-gradient(135deg, rgba(255, 226, 145, 0.10), transparent 36%),
+    rgba(18, 13, 10, 0.96);
+  border: 1px solid rgba(255, 214, 110, 0.82);
+  border-radius: var(--radius-s);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.48), 0 0 28px rgba(201, 162, 74, 0.22);
+  animation: feedbackIn 0.18s ease both;
+}
+.feedbackSeal {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  color: var(--c-kogane);
+  font-family: var(--font-fude);
+  font-size: 22px;
+  background: rgba(201, 162, 74, 0.12);
+}
+.feedbackBody { min-width: 0; }
+.feedbackTitle {
+  color: var(--c-kogane);
+  font-family: var(--font-fude);
+  font-size: 16px;
+  letter-spacing: 3px;
+}
+.feedbackRegion,
+.feedbackSecondary {
+  color: var(--c-kinari-d);
+  font-size: 11px;
+  line-height: 1.35;
+}
+.feedbackPrimary {
+  color: #fff1c6;
+  font-size: 17px;
+  font-family: var(--font-mincho);
+  line-height: 1.35;
+}
+.actionFeedback.collect .feedbackSeal { color: #E9C75A; }
+.actionFeedback.build .feedbackSeal { color: #8fd59a; }
+.actionFeedback.endTurn .feedbackSeal { color: var(--c-shu); }
+@keyframes feedbackIn {
+  from { opacity: 0; transform: translate(-50%, -8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
 }

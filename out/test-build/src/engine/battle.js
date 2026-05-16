@@ -198,7 +198,7 @@ function executeAction(args) {
     const skill = skillId ? (0, skills_1.getSkill)(skillId) : (0, skills_1.getSkill)('sk_zangeki');
     battle2.log.push({
         turn: battle2.turn,
-        message: `${atkG.name}が「${skill.name}」を発動`,
+        message: `${atkG.name}が「${skill.name}」を発動。${skill.description}`,
         cutInGeneralId: skill.effect.basePower >= 1.5 ? atkG.id : undefined,
         cutInDialogue: skill.cutInDialogue,
     });
@@ -234,7 +234,7 @@ function executeAction(args) {
                 continue;
             const dmg = calcDamage({ attacker: atk, attackerGeneral: atkG, target: tgt, targetGeneral: tgtG, skill, battle: battle2, rng });
             oppSlots[ti] = applyDamageTo(tgt, dmg);
-            battle2.log.push({ turn: battle2.turn, message: `→ ${tgtG.name}に ${dmg.toLocaleString()} の損害` });
+            battle2.log.push({ turn: battle2.turn, message: `→ ${tgtG.name}に ${dmg.toLocaleString()} の損害（残兵${oppSlots[ti].hp.toLocaleString()}）` });
             if (oppSlots[ti].hp === 0) {
                 battle2.log.push({ turn: battle2.turn, message: `${tgtG.name}は撤退した` });
             }
@@ -266,20 +266,25 @@ function executeAction(args) {
                 actorSlots[actor.index] = newSlot;
             else
                 actorSlots[t.i] = newSlot;
-            battle2.log.push({ turn: battle2.turn, message: `→ ${g.name}を ${heal.toLocaleString()} 回復` });
+            battle2.log.push({ turn: battle2.turn, message: `→ ${g.name}を ${heal.toLocaleString()} 回復（兵${newHp.toLocaleString()}）` });
         }
     }
     else if (skill.kind === 'support') {
         if (skill.effect.selfBuff) {
-            actorSlots[actor.index] = {
-                ...actorSlots[actor.index],
-                statusEffects: [
-                    ...actorSlots[actor.index].statusEffects,
-                    ...(skill.effect.selfBuff.atk ? [{ type: 'atk_up', turnsLeft: skill.effect.selfBuff.turns, magnitude: skill.effect.selfBuff.atk * 100 }] : []),
-                    ...(skill.effect.selfBuff.def ? [{ type: 'guard_up', turnsLeft: skill.effect.selfBuff.turns, magnitude: skill.effect.selfBuff.def * 100 }] : []),
-                ],
-            };
-            battle2.log.push({ turn: battle2.turn, message: `→ ${atkG.name}が強化された` });
+            const targetSlots = skill.target === 'ally_all'
+                ? actorSlots.map((slot, index) => ({ slot, index })).filter((x) => isAlive(x.slot))
+                : [{ slot: actorSlots[actor.index], index: actor.index }];
+            for (const target of targetSlots) {
+                actorSlots[target.index] = {
+                    ...actorSlots[target.index],
+                    statusEffects: [
+                        ...actorSlots[target.index].statusEffects,
+                        ...(skill.effect.selfBuff.atk ? [{ type: 'atk_up', turnsLeft: skill.effect.selfBuff.turns, magnitude: skill.effect.selfBuff.atk * 100 }] : []),
+                        ...(skill.effect.selfBuff.def ? [{ type: 'guard_up', turnsLeft: skill.effect.selfBuff.turns, magnitude: skill.effect.selfBuff.def * 100 }] : []),
+                    ],
+                };
+            }
+            battle2.log.push({ turn: battle2.turn, message: `→ ${skill.target === 'ally_all' ? '味方全体' : atkG.name}が強化された` });
         }
         if (skill.effect.debuff && skill.target === 'enemy_all') {
             for (let i = 0; i < oppSlots.length; i++) {
@@ -307,7 +312,7 @@ function executeAction(args) {
             if (skill.effect.basePower > 0) {
                 const dmg = calcDamage({ attacker: atk, attackerGeneral: atkG, target: tgt, targetGeneral: tgtG, skill, battle: battle2, rng });
                 oppSlots[ti] = applyDamageTo(tgt, dmg);
-                battle2.log.push({ turn: battle2.turn, message: `→ ${tgtG.name}に ${dmg.toLocaleString()} の損害` });
+                battle2.log.push({ turn: battle2.turn, message: `→ ${tgtG.name}に ${dmg.toLocaleString()} の損害（残兵${oppSlots[ti].hp.toLocaleString()}）` });
             }
             if (skill.effect.inflict && rng.chance(skill.effect.inflict.chance)) {
                 oppSlots[ti] = {
@@ -360,7 +365,9 @@ function determineResult(battle) {
 }
 // --- 自動進行 ---------------------------------------------------------------
 /** AI が選ぶスキル（高威力をランダムに） */
-function pickAiSkill(general, rng) {
+function pickAiSkill(general, rng, strategicTurn = 99) {
+    if (strategicTurn <= 3 && rng.chance(0.45))
+        return 'sk_zangeki';
     const candidates = general.skillIds.length > 0 ? general.skillIds : ['sk_zangeki'];
     return rng.pick(candidates);
 }
@@ -378,7 +385,7 @@ function autoStep(battle, state, rng) {
     const g = state.generals[slot.generalId];
     if (!g)
         return next;
-    const skillId = pickAiSkill(g, rng);
+    const skillId = actor.side === 'enemy' ? pickAiSkill(g, rng, state.turn) : pickAiSkill(g, rng);
     const after = executeAction({ battle: next, state, actor, skillId, targetIndex: null, rng });
     return { ...after, result: determineResult(after) };
 }
@@ -415,7 +422,7 @@ function aiExecuteAction(battle, state, actor, rng) {
     const g = state.generals[slot.generalId];
     if (!g)
         return battle;
-    const skillId = pickAiSkill(g, rng);
+    const skillId = pickAiSkill(g, rng, state.turn);
     const after = executeAction({ battle, state, actor, skillId, targetIndex: null, rng });
     return { ...after, result: determineResult(after) };
 }

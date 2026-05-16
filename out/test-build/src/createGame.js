@@ -75,6 +75,44 @@ function checkVictory(state) {
         return 'lose_timeout';
     return 'none';
 }
+function countPlayerRegions(state) {
+    return Object.values(state.regions).filter((r) => r.factionId === 'akatsuki').length;
+}
+function victoryReason(state, victory) {
+    if (victory === 'lose_zero')
+        return '支配地域が0になったため敗北';
+    if (victory === 'lose_timeout')
+        return '期限までに目標支配地域へ届かなかったため敗北';
+    if (victory === 'win_dominate')
+        return '12地域以上を支配したため勝利';
+    if (victory === 'win_youma')
+        return '妖魔勢力を討伐したため勝利';
+    return state.defeatReason;
+}
+function isDevRuntime() {
+    return typeof window !== 'undefined' && (window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1' ||
+        window.location.search.includes('debugTurn=1'));
+}
+function debugTurn(label, state) {
+    if (!isDevRuntime())
+        return;
+    const playerRegionIds = Object.values(state.regions)
+        .filter((r) => r.factionId === 'akatsuki')
+        .map((r) => r.id);
+    console.debug('[turn-debug]', {
+        label,
+        turn: state.turn,
+        playerRegions: playerRegionIds.length,
+        playerRegionIds,
+        gold: state.factions.akatsuki.treasury,
+        food: state.factions.akatsuki.food,
+        satisfaction: state.satisfaction,
+        homeRegion: '01',
+        homeOwner: state.regions['01']?.factionId,
+        victory: state.victory,
+    });
+}
 /** 月の進行 */
 function nextYearMonth(ym) {
     if (ym.month >= 12)
@@ -85,6 +123,8 @@ function nextYearMonth(ym) {
 function endTurn(state) {
     const rng = (0, engine_1.createRng)(state.rngSeed);
     let next = state;
+    debugTurn('turn-start', next);
+    const regionsAtStart = countPlayerRegions(next);
     // 1. 経済処理
     next = (0, engine_1.applyEconomyTick)(next);
     // 2. 満足度自然減＋HUD満足度更新
@@ -104,11 +144,22 @@ function endTurn(state) {
         };
     }
     // 5. NPC勢力の行動
+    debugTurn('before-npc', next);
     next = (0, engine_1.runNpcTurn)(next, rng);
+    debugTurn('after-npc', next);
     // 6. 浪人プール補充
     next = (0, engine_1.refillRoninPool)(next, rng);
     // 7. 勝敗判定
     const victory = checkVictory(next);
+    if (victory !== 'none' && isDevRuntime()) {
+        console.debug('[turn-debug]', {
+            label: 'victory-check',
+            condition: victory,
+            reason: victoryReason(next, victory),
+            playerRegionsBeforeTurn: regionsAtStart,
+            playerRegionsAfterNpc: countPlayerRegions(next),
+        });
+    }
     // 8. ターンと月の進行
     next = {
         ...next,
@@ -118,6 +169,7 @@ function endTurn(state) {
         score: (0, engine_1.computeScore)(next),
         rngSeed: rng.getSeed(),
         victory,
+        defeatReason: victoryReason(next, victory),
     };
     // 9. 自動セーブ（勝敗確定時はセーブしない）
     if (victory === 'none') {

@@ -31,6 +31,24 @@ const HOME_REGION: Partial<Record<FactionId, RegionId>> = {
   ronin: '15',
 };
 
+const MAP_LAYOUT: Record<RegionId, { x: number; y: number }> = {
+  '01': { x: 51, y: 55 },
+  '02': { x: 76, y: 45 },
+  '03': { x: 76, y: 60 },
+  '04': { x: 62, y: 30 },
+  '05': { x: 59, y: 78 },
+  '06': { x: 47, y: 68 },
+  '07': { x: 35, y: 86 },
+  '08': { x: 22, y: 36 },
+  '09': { x: 34, y: 19 },
+  '10': { x: 57, y: 13 },
+  '11': { x: 31, y: 53 },
+  '12': { x: 21, y: 69 },
+  '13': { x: 42, y: 42 },
+  '14': { x: 74, y: 20 },
+  '15': { x: 16, y: 88 },
+};
+
 const TERRAIN_LABEL: Record<Terrain, string> = {
   plain: '田',
   mountain: '山',
@@ -116,6 +134,10 @@ function roadPath(ax: number, ay: number, bx: number, by: number, seed: number):
   return `M ${ax} ${ay} Q ${cx} ${cy} ${bx} ${by}`;
 }
 
+function mapPoint(id: RegionId): { x: number; y: number } {
+  return MAP_LAYOUT[id];
+}
+
 export function YashimaMap({ state, selectedId, onSelect }: Props) {
   const deployable = useMemo(() => getDeployableGenerals(state).slice(0, 3), [state]);
   const templateById = useMemo(() => new Map(REGION_TEMPLATES.map((r) => [r.id, r])), []);
@@ -199,6 +221,11 @@ export function YashimaMap({ state, selectedId, onSelect }: Props) {
 
       <rect x="0" y="0" width="100" height="100" fill="url(#paper-bg)" />
       <rect x="0" y="0" width="100" height="100" fill="url(#paper-noise)" />
+      <g className="mapLandMass">
+        <path d="M33 8 C47 3 66 5 77 18 C89 31 88 54 78 70 C67 88 45 96 27 90 C12 85 6 70 12 54 C17 39 18 18 33 8 Z" />
+        <path d="M70 20 C78 23 84 31 85 41 C80 37 76 33 70 34 Z" />
+        <path d="M12 78 C18 76 25 80 27 88 C20 87 15 84 12 78 Z" />
+      </g>
 
       <g className="mapInkLines">
         <path d="M4 15 C16 10 26 14 36 10 S61 7 73 12 S90 13 97 9" />
@@ -213,11 +240,13 @@ export function YashimaMap({ state, selectedId, onSelect }: Props) {
           const rb = templateById.get(b);
           if (!ra || !rb) return null;
           const selectedRoad = selectedId === a || selectedId === b;
+          const pa = mapPoint(a as RegionId);
+          const pb = mapPoint(b as RegionId);
           return (
             <path
               key={`road-${a}-${b}`}
               className={`strategyRoad ${selectedRoad ? 'selected' : ''}`}
-              d={roadPath(ra.mapX, ra.mapY, rb.mapX, rb.mapY, Number(a) * 11 + Number(b) * 17)}
+              d={roadPath(pa.x, pa.y, pb.x, pb.y, Number(a) * 11 + Number(b) * 17)}
             />
           );
         })}
@@ -244,8 +273,7 @@ export function YashimaMap({ state, selectedId, onSelect }: Props) {
           const isHome = fid && HOME_REGION[fid] === tmpl.id;
           const isPlayerHome = isHome && fid === 'akatsuki';
           const isEnemyHome = isHome && fid !== 'akatsuki';
-          const cx = tmpl.mapX;
-          const cy = tmpl.mapY;
+          const { x: cx, y: cy } = mapPoint(tmpl.id);
           const width = tmpl.name.length >= 4 ? 15 : 13.2;
           const height = 10.5;
           const danger = fid && fid !== 'akatsuki' ? Math.min(9, region.power + (attackable ? 2 : 0)) : region.power;

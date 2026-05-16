@@ -14,6 +14,8 @@ interface Props {
   isTargetable: boolean;
   isSelectedTarget: boolean;
   damageFlash?: number; // 直近のダメージ数値（一瞬表示）
+  isActing?: boolean;
+  isImpacted?: boolean;
   onClick?: () => void;
 }
 
@@ -28,7 +30,7 @@ const STATUS_GLYPH: Record<StatusEffectType, { glyph: string; color: string; lab
   sealed:   { glyph: '封', color: '#888', label: '封印' },
 };
 
-export function BattleCard({ state, slot, side, isActive, isTargetable, isSelectedTarget, damageFlash, onClick }: Props) {
+export function BattleCard({ state, slot, side, isActive, isTargetable, isSelectedTarget, damageFlash, isActing, isImpacted, onClick }: Props) {
   if (!slot.generalId) {
     return <div className={`battleCard empty ${side}`} aria-hidden="true" />;
   }
@@ -44,6 +46,8 @@ export function BattleCard({ state, slot, side, isActive, isTargetable, isSelect
     isActive && 'active',
     isTargetable && 'targetable',
     isSelectedTarget && 'selectedTarget',
+    isActing && 'actingFx',
+    isImpacted && 'impactFx',
     dead && 'dead',
   ].filter(Boolean).join(' ');
 

@@ -16,6 +16,7 @@ exports.loadAutoSave = loadAutoSave;
 exports.deleteAutoSave = deleteAutoSave;
 exports.hasAutoSave = hasAutoSave;
 const game_1 = require("../types/game");
+const portraitKeys_1 = require("../data/portraitKeys");
 const SAVE_KEY = 'gunyu_no_kuni_save_v21';
 const AUTO_SAVE_KEY = 'gunyu_no_kuni_autosave_v21';
 function storageAvailable() {
@@ -51,6 +52,16 @@ function validateGameState(value) {
         return false;
     return true;
 }
+function normalizeLoadedState(state) {
+    const generals = { ...state.generals };
+    for (const [id, general] of Object.entries(state.generals)) {
+        const portraitKey = (0, portraitKeys_1.normalizePortraitKey)(general);
+        if (general.portraitKey !== portraitKey) {
+            generals[id] = { ...general, portraitKey };
+        }
+    }
+    return { ...state, generals };
+}
 function serializeGameState(state) {
     const saveData = {
         version: game_1.SAVE_VERSION,
@@ -74,7 +85,7 @@ function deserializeSaveData(raw) {
         if (!validateGameState(parsed.state)) {
             return { ok: false, state: null, error: 'ゲーム状態の整合性チェックに失敗しました' };
         }
-        return { ok: true, state: parsed.state, error: null };
+        return { ok: true, state: normalizeLoadedState(parsed.state), error: null };
     }
     catch {
         return { ok: false, state: null, error: 'セーブデータの読み込みに失敗しました（JSON破損の可能性）' };

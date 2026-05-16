@@ -169,6 +169,15 @@ function run(): void {
     }
   });
 
+  test('ターン終了時にNPC勢力の行動が作戦記に残る', () => {
+    const state = createNewGame(111);
+    const next = endTurn(state);
+    const npcLogs = next.log.filter((entry) => entry.actor !== 'player');
+
+    assert.ok(npcLogs.length > 0);
+    assert.ok(npcLogs.some((entry) => entry.type === 'build' || entry.type === 'battle'));
+  });
+
   test('出陣前の戦力予測が危険度と勝率を返す', () => {
     const state = createNewGame(12);
     const forecast = createBattleForecast(state, '03', getDeployableGenerals(state).slice(0, 3));

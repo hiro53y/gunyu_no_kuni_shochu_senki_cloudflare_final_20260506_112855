@@ -33,6 +33,15 @@ interface Props {
 }
 
 type OverlayKind = 'recruit' | 'settings' | null;
+type ActionFeedbackKind = 'build' | 'collect' | 'scout' | 'rest' | 'endTurn' | 'battle';
+
+interface ActionFeedback {
+  kind: ActionFeedbackKind;
+  title: string;
+  regionName?: string;
+  primary: string;
+  secondary: string;
+}
 
 export function MapScreen({ state, setState, onReturnTitle }: Props) {
   const [selectedId, setSelectedId] = useState<RegionId | null>('01');
@@ -41,6 +50,7 @@ export function MapScreen({ state, setState, onReturnTitle }: Props) {
   const [detailGeneralId, setDetailGeneralId] = useState<string | null>(null);
   const [activeBattle, setActiveBattle] = useState<BattleState | null>(null);
   const [pendingBattleRegion, setPendingBattleRegion] = useState<RegionId | null>(null);
+  const [actionFeedback, setActionFeedback] = useState<ActionFeedback | null>(null);
 
   // 地図画面に居る間は map BGM を流す
   useEffect(() => {
@@ -52,6 +62,13 @@ export function MapScreen({ state, setState, onReturnTitle }: Props) {
   const flash = useCallback((msg: string) => {
     setNotice(msg);
     window.setTimeout(() => setNotice(''), 2500);
+  }, []);
+
+  const showActionFeedback = useCallback((feedback: ActionFeedback) => {
+    setActionFeedback(feedback);
+    window.setTimeout(() => {
+      setActionFeedback((current) => current?.title === feedback.title ? null : current);
+    }, 2200);
   }, []);
 
   const updateConfig = useCallback((next: GameConfig) => {
@@ -152,7 +169,21 @@ export function MapScreen({ state, setState, onReturnTitle }: Props) {
   const handleAction = useCallback((action: ActionKind) => {
     if (action === 'endTurn') {
       audio.play('turnEnd');
-      setState((s) => endTurn(s));
+      setState((s) => {
+        const beforeTurn = s.turn;
+        const beforeLogCount = s.log.length;
+        const next = endTurn(s);
+        const npcCount = next.log
+          .slice(0, Math.max(0, next.log.length - beforeLogCount + 8))
+          .filter((entry) => entry.actor !== 'player').length;
+        showActionFeedback({
+          kind: 'endTurn',
+          title: '敵勢力が行動',
+          primary: `第${beforeTurn}月を終了`,
+          secondary: npcCount > 0 ? `敵側の行動 ${npcCount}件を作戦記に記録` : '敵側は内政・警戒に留まった',
+        });
+        return next;
+      });
       flash('ターン終了');
       return;
     }
@@ -176,6 +207,13 @@ export function MapScreen({ state, setState, onReturnTitle }: Props) {
             const r = applyBuildAction(s, selectedId!, 'farm');
             flash(r.message);
             if (!r.ok) { audio.play('fail'); return s; }
+            showActionFeedback({
+              kind: 'build',
+              title: '建設完了',
+              regionName: r.state.regions[selectedId!]?.name,
+              primary: '田畑を強化',
+              secondary: `国力 ${s.regions[selectedId!].power} → ${r.state.regions[selectedId!].power} / 田畑 Lv${r.state.regions[selectedId!].buildLevels.farm}`,
+            });
             const consumed = consumeAp(r.state, 1);
             return consumed.ok ? consumed.state : r.state;
           }
@@ -183,6 +221,13 @@ export function MapScreen({ state, setState, onReturnTitle }: Props) {
             const r = applyCollectAction(s, selectedId!);
             flash(r.message);
             if (!r.ok) { audio.play('fail'); return s; }
+            showActionFeedback({
+              kind: 'collect',
+              title: '徴収実行',
+              regionName: r.state.regions[selectedId!]?.name,
+              primary: `+${r.gained.toLocaleString()}金`,
+              secondary: `満足度 ${s.regions[selectedId!].satisfaction} → ${r.state.regions[selectedId!].satisfaction}`,
+            });
             const consumed = consumeAp(r.state, 1);
             return consumed.ok ? consumed.state : r.state;
           }
@@ -200,6 +245,13 @@ export function MapScreen({ state, setState, onReturnTitle }: Props) {
             if (!region) { flash('地域が見つかりません'); return s; }
             const gain = 800;
             flash(`${region.name}を探索（${gain}金）`);
+            showActionFeedback({
+              kind: 'scout',
+              title: '探索成功',
+              regionName: region.name,
+              primary: `+${gain.toLocaleString()}金`,
+              secondary: '隠れた資金と噂を集めた',
+            });
             return {
               ...consumed.state,
               factions: {
@@ -214,6 +266,12 @@ export function MapScreen({ state, setState, onReturnTitle }: Props) {
               .map((g) => g.id);
             audio.play('heal');
             flash('武将が休養した');
+            showActionFeedback({
+              kind: 'rest',
+              title: '休養',
+              primary: '兵と気力を回復',
+              secondary: '配下武将の兵数とスタミナが戻った',
+            });
             return applyRestAction(s, playerGenerals);
           }
         }
@@ -221,7 +279,7 @@ export function MapScreen({ state, setState, onReturnTitle }: Props) {
       })();
       return after;
     });
-  }, [selectedId, setState, flash, handleBattleStart]);
+  }, [selectedId, setState, flash, handleBattleStart, showActionFeedback]);
 
   const handlePersuade = useCallback((id: string) => {
     setState((s) => {
@@ -290,6 +348,7 @@ export function MapScreen({ state, setState, onReturnTitle }: Props) {
       <ActionBar state={state} selectedRegionId={selectedId} onAction={handleAction} />
 
       {notice && <div className="toast">{notice}</div>}
+      {actionFeedback && <ActionFeedbackPanel feedback={actionFeedback} />}
 
       {overlay === 'recruit' && (
         <RecruitDialog
@@ -320,6 +379,20 @@ export function MapScreen({ state, setState, onReturnTitle }: Props) {
       {state.victory !== 'none' && (
         <ResultOverlay state={state} onReturnTitle={onReturnTitle} />
       )}
+    </div>
+  );
+}
+
+function ActionFeedbackPanel({ feedback }: { feedback: ActionFeedback }) {
+  return (
+    <div className={`actionFeedback ${feedback.kind}`} role="status" aria-live="polite">
+      <div className="feedbackSeal">{feedback.kind === 'collect' ? '金' : feedback.kind === 'build' ? '築' : feedback.kind === 'endTurn' ? '敵' : '報'}</div>
+      <div className="feedbackBody">
+        <div className="feedbackTitle">{feedback.title}</div>
+        {feedback.regionName && <div className="feedbackRegion">{feedback.regionName}</div>}
+        <div className="feedbackPrimary">{feedback.primary}</div>
+        <div className="feedbackSecondary">{feedback.secondary}</div>
+      </div>
     </div>
   );
 }

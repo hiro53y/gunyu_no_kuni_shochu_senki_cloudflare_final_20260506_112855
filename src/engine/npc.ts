@@ -110,15 +110,27 @@ function tryNpcImprove(state: GameState, fid: FactionId): GameState {
   if (own.length === 0) return state;
   // 国力が低い地域を1つ強化
   const target = own.sort((a, b) => a.power - b.power)[0];
+  const faction = state.factions[fid];
+  const improved = {
+    ...target,
+    power: Math.min(10, target.power + 1),
+    satisfaction: Math.min(100, target.satisfaction + 3),
+  };
   return {
     ...state,
+    log: [
+      {
+        turn: state.turn,
+        actor: fid,
+        type: 'build' as const,
+        targetRegionId: target.id,
+        message: `${faction.name}が${target.name}を整備（国力${target.power}→${improved.power}）`,
+      },
+      ...state.log,
+    ].slice(0, 80),
     regions: {
       ...state.regions,
-      [target.id]: {
-        ...target,
-        power: Math.min(10, target.power + 1),
-        satisfaction: Math.min(100, target.satisfaction + 3),
-      },
+      [target.id]: improved,
     },
   };
 }
@@ -154,7 +166,8 @@ export function runNpcTurn(state: GameState, rng: Rng): GameState {
     for (let i = 0; i < acts; i++) {
       // 性格に応じて侵攻。プレイヤー絡みも自動解決し、世界情勢へ反映する。
       if (rng.chance(aggressionScore(f))) {
-        next = tryNpcInvasion(next, fid, rng);
+        const invaded = tryNpcInvasion(next, fid, rng);
+        next = invaded === next ? tryNpcImprove(next, fid) : invaded;
       } else {
         next = tryNpcImprove(next, fid);
       }
