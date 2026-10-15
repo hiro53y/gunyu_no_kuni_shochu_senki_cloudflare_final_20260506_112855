@@ -29,7 +29,7 @@ export function TitleScreen(props: { c: Campaign | null; running: boolean; onCon
             <button onClick={click(props.onSettings)}>設定</button>
           </div>
         </div>
-        <p className="credit">v4.0 ・ 八洲十五国を、部隊の合戦で切り取れ</p>
+        <p className="credit">v4.1 ・ 八洲十五国を、六対六の合戦で切り取れ</p>
       </div>
       {confirm && (
         <Modal title="はじめから遊びますか？" onClose={() => setConfirm(false)}>

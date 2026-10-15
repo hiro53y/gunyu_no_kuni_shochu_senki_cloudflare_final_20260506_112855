@@ -1,7 +1,7 @@
 {
   "name": "群雄ノ國：掌中戦記",
   "short_name": "掌中戦記",
-  "description": "左右に分かれた部隊の合戦で八洲十五国を切り取る、国盗り合戦シミュレーション",
+  "description": "武将と兵の集団が左右に並ぶ六対六の合戦で八洲十五国を切り取る、国盗り合戦シミュレーション",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0b1220",

@@ -1,17 +1,17 @@
-// 武将の一覧と詳しい情報（兵種・兵数・能力・技・絆・交流）
+// 武将の一覧と詳しい情報（兵種・兵数・能力・技能・技・絆・交流）、牢の将の説得
 import { useState } from 'react';
 import { FACTIONS } from '../content/sengoku';
 import { GENERALS, GEN_BY_ID, LORD } from '../content/generals';
 import { KINDS, RANGE_NAME, battleSkill } from '../battle/kinds';
 import type { Campaign, GenState, Scene } from '../campaign/state';
 import { bondError, doBond, expFor, genInfo, maxTroops } from '../campaign/campaign';
-import { genPower, unitSkills } from '../campaign/army';
+import { TRAIT_DESC, TRAIT_NAME, apOf, genPower, traitsOf, unitSkills } from '../campaign/army';
 import { KindMark, Modal, bustUrl, tokenUrl } from './common';
 import { playSe } from '../audio/sound';
 
 const STATUS: Record<GenState['status'], string> = { ours: '家臣', enemy: '敵', jail: '牢', ronin: '浪人', gone: '' };
 
-export function GeneralsPanel({ c, onChange, onScene, onClose }: { c: Campaign; onChange: () => void; onScene: (s: Scene) => void; onClose: () => void }) {
+export function GeneralsPanel({ c, onChange, onScene, onPersuade, onClose }: { c: Campaign; onChange: () => void; onScene: (s: Scene) => void; onPersuade: (id: string) => void; onClose: () => void }) {
   const [sel, setSel] = useState<string | null>(null);
   const [tab, setTab] = useState<'ours' | 'book'>('ours');
   const ours = [LORD, ...Object.values(c.gens).filter((g) => g.status === 'ours' && g.id !== LORD).sort((a, b) => b.lv - a.lv).map((g) => g.id)];
@@ -38,8 +38,8 @@ export function GeneralsPanel({ c, onChange, onScene, onClose }: { c: Campaign; 
                   <span className="gc-main">
                     <b>{info.name}</b> <small><KindMark kind={g.kind} size={14} /> {KINDS[g.kind].name}・Lv{g.lv}・{info.role}</small>
                     <span className="troop-bar"><span style={{ width: `${(g.troops / max) * 100}%` }} /></span>
-                    <small>兵 {g.troops}/{max}{id !== LORD && info.unique ? `・絆${'♥'.repeat(g.bond)}${'♡'.repeat(Math.max(0, 2 - g.bond))}` : ''}</small>
-                    {g.injured > 0 && <small className="bad">傷を癒やしている（あと{g.injured}季節）</small>}
+                    <small>兵 {g.troops}/{max}{g.wounded ? `（傷${g.wounded}）` : ''}{id !== LORD && info.unique ? `・絆${'♥'.repeat(g.bond)}${'♡'.repeat(Math.max(0, 2 - g.bond))}` : ''}</small>
+                    {g.injured > 0 && <small className="bad">部隊が壊滅し、立て直し中（あと{g.injured}季節）</small>}
                   </span>
                 </button>
               );
@@ -48,15 +48,16 @@ export function GeneralsPanel({ c, onChange, onScene, onClose }: { c: Campaign; 
           {jail.length > 0 && (
             <>
               <h4>牢</h4>
-              <p className="note">主家が滅ぶと、家臣になる。</p>
+              <p className="note">説得（知略の合計・扇を使わない）か、主家が滅ぶと家臣になる。</p>
               <div className="gen-pick">
                 {jail.map((g) => {
                   const info = genInfo(c, g.id);
                   return (
-                    <div key={g.id} className="gen-card static">
+                    <button key={g.id} className="gen-card" onClick={() => { playSe('menu'); onPersuade(g.id); }}>
                       <img src={tokenUrl(info.portrait)} alt="" width={42} height={42} />
                       <span className="gc-main"><b>{info.name}</b><small>{FACTIONS[g.faction].name}・{KINDS[g.kind].name}・Lv{g.lv}</small></span>
-                    </div>
+                      <span className="check">説得</span>
+                    </button>
                   );
                 })}
               </div>
@@ -99,13 +100,14 @@ function GeneralDetail({ c, id, onBack, onBond }: { c: Campaign; id: string; onB
         <div className="gd-stats">
           <p className="gd-role">{info.role}</p>
           <p><KindMark kind={g.kind} /> {KINDS[g.kind].name}・Lv <b>{g.lv}</b>（次まで {Math.max(0, expFor(g.lv + 1) - g.exp)}）</p>
-          <p>兵 {g.troops}/{maxTroops(c, id)}・技数 {KINDS[g.kind].ap + Math.floor(g.lv / 10)}</p>
+          <p>兵 {g.troops}/{maxTroops(c, id)}{g.wounded ? `（傷${g.wounded}）` : ''}・技数 {apOf(g.kind, g.lv)}</p>
           <p className="stats">攻{pw.atk} 防{pw.def} 知{pw.int} 速{pw.spd}</p>
           <p className="stats">統{info.cmd} 武{info.pow} 知{info.int}</p>
           {!isLord && info.unique && <p>絆 {'♥'.repeat(g.bond)}{'♡'.repeat(Math.max(0, (def?.bond.length ?? 2) - g.bond))}</p>}
         </div>
       </div>
       <p className="desc">{info.desc}</p>
+      {traitsOf(c, id).map((t) => <p key={t} className="trait"><b>{TRAIT_NAME[t]}</b><small>{TRAIT_DESC[t]}</small></p>)}
       <p className="note">{KINDS[g.kind].desc}</p>
       <h4>合戦の技</h4>
       {skills.map((sid) => {
@@ -113,7 +115,7 @@ function GeneralDetail({ c, id, onBack, onBond }: { c: Campaign; id: string; onB
         return (
           <div key={sid} className="skill-row">
             <b style={{ color: s.color }}>{s.name}</b>
-            <small>{RANGE_NAME[s.range]}・消費{s.cost === 'all' ? '全' : s.cost}・硬直{s.stiff}{s.prep ? '・要準備' : ''}　{s.desc}</small>
+            <small>{RANGE_NAME[s.range]}・消費{s.cost === 'all' ? '全' : s.cost}・硬直{s.stiff}{s.mult > 0 && s.effect !== 'heal' ? `・×${Math.round(s.mult * 100) / 100}` : ''}{s.counter > 0 ? `・反撃${Math.round(s.counter * 100)}%` : ''}{s.prep ? '・要準備' : ''}　{s.desc}</small>
           </div>
         );
       })}
@@ -129,7 +131,7 @@ function GeneralDetail({ c, id, onBack, onBond }: { c: Campaign; id: string; onB
       {!isLord && (
         <div className="row-buttons">
           <button onClick={onBack}>戻る</button>
-          <button className="primary" disabled={!!err} onClick={() => { playSe('menu'); onBond(); }}>交流する（行動1）{err ? <small>{err}</small> : null}</button>
+          <button className="primary" disabled={!!err} onClick={() => { playSe('menu'); onBond(); }}>交流する（扇1）{err ? <small>{err}</small> : null}</button>
         </div>
       )}
     </Modal>

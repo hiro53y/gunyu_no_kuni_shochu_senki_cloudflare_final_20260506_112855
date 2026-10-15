@@ -1,4 +1,4 @@
-// 陣立て：出す武将（朔を含め6部隊まで）を前衛・後衛の枠に置く。敵の顔ぶれも見える
+// 陣立て：出す武将（6部隊まで）を前衛・後衛の枠に置く。敵の顔ぶれと戦場も見える。朔の部隊が壊滅すると終わり
 import { useMemo, useState } from 'react';
 import { regionDef } from '../content/sengoku';
 import { LORD } from '../content/generals';
@@ -6,7 +6,8 @@ import { KINDS, battleSkill } from '../battle/kinds';
 import type { UnitSpec } from '../battle/engine';
 import type { BattleKind } from '../battle/types';
 import type { Campaign, Invasion, Placement, Sortie } from '../campaign/state';
-import { MAX_PARTY, forts, genInfo, huntDanger, invasionDanger, maxTroops } from '../campaign/campaign';
+import { LAND_NAME, MAX_PARTY, genInfo, groundOf, huntDanger, maxTroops } from '../campaign/campaign';
+import { GROUND_NAME } from '../battle/engine';
 import { autoPlace, genPower, huntArmy, invasionArmy, siegeArmy, unitSkills } from '../campaign/army';
 import { KindMark, Modal, bustUrl, tokenUrl } from './common';
 import { playSe } from '../audio/sound';
@@ -15,9 +16,9 @@ const MODE_TITLE: Record<BattleKind, string> = { siege: '出陣', defense: '迎�
 
 /** 出陣前に、敵の部隊を作ってみる（同じ seed なら本番も同じ） */
 export function previewEnemy(c: Campaign, mode: BattleKind, rid: string, seed: number, inv?: Invasion): UnitSpec[] {
-  const so: Sortie = { mode, region: rid, party: [], invasion: inv, fort: mode === 'siege' ? c.regions[rid].taken : undefined, temps: {} };
+  const so: Sortie = { mode, region: rid, party: [], invasion: inv, land: mode === 'siege' ? c.regions[rid].taken : undefined, temps: {} };
   if (mode === 'siege') return siegeArmy(c, so, seed);
-  if (mode === 'defense' && inv) return invasionArmy(c, so, inv, seed, invasionDanger(c, inv.from));
+  if (mode === 'defense' && inv) return invasionArmy(c, so, inv, seed);
   return huntArmy(c, so, seed, huntDanger(c, rid));
 }
 
@@ -28,9 +29,14 @@ export function Formation({ c, mode, region, seed, inv, onGo, onClose }: { c: Ca
   const usable = (id: string) => c.gens[id].injured <= 0 && c.gens[id].troops > 0;
   const [slots, setSlots] = useState<Record<string, string>>(() => {
     const score = (id: string) => { const p = genPower(c, id); return (p.atk + p.def + p.int) * Math.sqrt(c.gens[id].troops); };
-    const list = ready.filter((g) => g.id !== LORD && usable(g.id)).sort((a, b) => score(b.id) - score(a.id)).slice(0, MAX_PARTY - 1);
+    const others = ready.filter((g) => g.id !== LORD && usable(g.id)).sort((a, b) => score(b.id) - score(a.id));
+    const withLord = others.length < 4 && usable(LORD);
+    const list = [...(withLord ? [c.gens[LORD]] : []), ...others].slice(0, MAX_PARTY);
     const out: Record<string, string> = {};
-    for (const p of autoPlace([c.gens[LORD], ...list].filter((g) => usable(g.id)).map((g) => ({ id: g.id, kind: g.kind })))) out[key(p.row, p.slot)] = p.gen;
+    for (const p of autoPlace(list.map((g) => ({ id: g.id, kind: g.kind })))) out[key(p.row, p.slot)] = p.gen;
+    // 朔は後衛へ（空きがあれば）
+    const lk = Object.keys(out).find((k) => out[k] === LORD);
+    if (lk && lk[0] === '0') { const free = ['11', '10', '12'].find((k) => !out[k]); if (free) { out[free] = LORD; delete out[lk]; } }
     return out;
   });
   const [sel, setSel] = useState<string | null>(null);
@@ -39,6 +45,7 @@ export function Formation({ c, mode, region, seed, inv, onGo, onClose }: { c: Ca
   const placedIds = new Set(Object.values(slots));
   const r = regionDef(region);
   const lordPlaced = placedIds.has(LORD);
+  const ground = groundOf(c, mode, region, mode === 'siege' ? c.regions[region].taken : undefined) ?? 'field';
 
   const assign = (id: string) => {
     playSe('menu');
@@ -50,7 +57,6 @@ export function Formation({ c, mode, region, seed, inv, onGo, onClose }: { c: Ca
       next[sel] = id;
       setSel(null);
     } else if (cur) {
-      if (id === LORD) return;
       delete next[cur];
     } else {
       const empty = ['00', '01', '02', '10', '11', '12'].filter((k) => !next[k]);
@@ -95,7 +101,7 @@ export function Formation({ c, mode, region, seed, inv, onGo, onClose }: { c: Ca
       </button>
     );
   };
-  const title = mode === 'siege' ? `${MODE_TITLE[mode]}：${r.name}（砦 ${c.regions[region].taken + 1}/${forts(region)}）` : `${MODE_TITLE[mode]}：${r.name}`;
+  const title = mode === 'siege' ? `${MODE_TITLE[mode]}：${r.name}（${LAND_NAME[ground]} ${c.regions[region].taken + 1}/${c.regions[region].lands.length}）` : `${MODE_TITLE[mode]}：${r.name}`;
   return (
     <Modal title={title} onClose={onClose} className="inventory formation">
       <div className="tabs seg">
@@ -109,7 +115,8 @@ export function Formation({ c, mode, region, seed, inv, onGo, onClose }: { c: Ca
             <div className="fg-col"><small>前衛</small>{[0, 1, 2].map((s) => cell(key(0, s)))}</div>
             <div className="fg-arrow">▶<small>敵</small></div>
           </div>
-          <p className="note">{sel ? '置く武将を下から選ぶか、入れ替える枠を押してください。' : '枠を押して選び、武将を置く・入れ替える。前衛は近距離の技が使え、狙われやすい。足軽は同じ列の味方をかばう。'}</p>
+          <p className="note">{sel ? '置く武将を下から選ぶか、入れ替える枠を押してください。' : `枠を押して選び、武将を置く・入れ替える。武士・足軽・鉄砲・僧兵は前衛の列からしか攻撃できない。足軽は同じ列の味方をかばう。戦場：${GROUND_NAME[ground]}${mode === 'defense' ? '（守る側の上乗せあり）' : ground !== 'field' ? '（敵に守りの上乗せ）' : ''}`}</p>
+          {lordPlaced && <p className="bad small-note">朔の部隊が壊滅すると暁ノ家はおしまい（季節の始めからやり直し）。</p>}
           <div className="gen-pick">
             {ready.sort((a, b) => (a.id === LORD ? -1 : b.id === LORD ? 1 : b.lv - a.lv)).map((g) => {
               const info = genInfo(c, g.id);
@@ -123,7 +130,7 @@ export function Formation({ c, mode, region, seed, inv, onGo, onClose }: { c: Ca
                     <small>技 {unitSkills(c, g.id, true).map((s) => battleSkill(s).name).join('・')}</small>
                     {!ok && <small className="bad">{g.injured > 0 ? `傷を癒やしている（あと${g.injured}季節）` : '兵がいない（城下で補充）'}</small>}
                   </span>
-                  {on && <span className="check">{g.id === LORD ? '大将' : '出陣'}</span>}
+                  {on && <span className="check">{g.id === LORD ? '当主' : '出陣'}</span>}
                 </button>
               );
             })}
@@ -141,13 +148,13 @@ export function Formation({ c, mode, region, seed, inv, onGo, onClose }: { c: Ca
               </span>
             </div>
           ))}
-          {mode === 'siege' && <p className="note">{c.regions[region].taken + 1 >= forts(region) ? '本城の合戦。勝てば国が手に入る。' : `勝つと砦を1つ落とす。すべて落とすと国が手に入る。`}</p>}
+          {mode === 'siege' && <p className="note">{c.regions[region].taken + 1 >= c.regions[region].lands.length ? '城の合戦。勝てば国が手に入る。' : '勝つと領地を1つ取る。すべて取ると国が手に入る。'}</p>}
           <img className="enemy-bust" src={bustUrl(enemy.find((u) => u.boss)?.portrait ?? enemy[0]?.portrait ?? 'generic_normal')} alt="" />
         </div>
       )}
       <div className="row-buttons">
         {onClose && <button onClick={onClose}>やめる</button>}
-        <button className="primary" disabled={!lordPlaced} onClick={go}>{mode === 'defense' ? '迎え撃つ！' : '出陣！'}{!lordPlaced && <small>朔を置いてください</small>}</button>
+        <button className="primary" disabled={placedIds.size === 0} onClick={go}>{mode === 'defense' ? '迎え撃つ！' : '出陣！'}{placedIds.size === 0 && <small>武将を置いてください</small>}</button>
       </div>
     </Modal>
   );

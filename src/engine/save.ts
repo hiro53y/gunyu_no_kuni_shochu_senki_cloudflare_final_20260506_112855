@@ -5,10 +5,10 @@ import { BATTLE_VERSION } from '../battle/engine';
 import type { Battle } from '../battle/types';
 import { CAMPAIGN_VERSION, DEFAULT_SETTINGS, type Campaign, type Settings } from '../campaign/state';
 
-export const KEY_BATTLE = 'gunyu4:battle';
-export const KEY_CAMPAIGN = 'gunyu4:campaign';
-export const KEY_SNAPSHOT = 'gunyu4:turnstart';
-export const KEY_SETTINGS = 'gunyu4:settings';
+export const KEY_BATTLE = 'gunyu41:battle';
+export const KEY_CAMPAIGN = 'gunyu41:campaign';
+export const KEY_SNAPSHOT = 'gunyu41:turnstart';
+export const KEY_SETTINGS = 'gunyu41:settings';
 
 export interface KV {
   getItem(key: string): string | null;
@@ -30,7 +30,7 @@ const num = (n: unknown) => typeof n === 'number' && Number.isFinite(n);
 export function validBattle(value: unknown): value is Battle {
   const b = value as Battle;
   if (!b || b.v !== BATTLE_VERSION || !Array.isArray(b.units) || !b.units.length) return false;
-  if (![b.time, b.limit, b.rng, b.gaugeAdj].every(num)) return false;
+  if (![b.time, b.ticks, b.ticksMax, b.rng].every(num) || !b.dmg || !b.adj || !b.field) return false;
   return b.units.every((u) => !!KINDS[u.kind] && [u.troops, u.maxTroops, u.ap, u.next].every(num) && Array.isArray(u.skills));
 }
 
@@ -48,8 +48,9 @@ export function validCampaign(value: unknown): value is Campaign {
   const c = value as Campaign;
   if (!c || c.v !== CAMPAIGN_VERSION) return false;
   if (!c.regions || REGIONS.some((r) => !c.regions[r.id]) || !c.gens || !c.factions || !c.gens.g_saku) return false;
-  for (const n of [c.turn, c.ap, c.gold, c.rng]) if (!num(n)) return false;
-  return Object.values(c.gens).every((g) => !!KINDS[g.kind] && num(g.troops) && num(g.lv));
+  for (const n of [c.turn, c.fans, c.fame, c.gold, c.rng]) if (!num(n)) return false;
+  if (REGIONS.some((r) => !Array.isArray(c.regions[r.id].lands) || !num(c.regions[r.id].np))) return false;
+  return Object.values(c.gens).every((g) => !!KINDS[g.kind] && num(g.troops) && num(g.wounded) && num(g.lv));
 }
 
 export function deserializeCampaign(text: string | null): Campaign | null {
@@ -64,6 +65,7 @@ export function deserializeCampaign(text: string | null): Campaign | null {
     c.flags ??= {};
     c.titles ??= {};
     c.news ??= [];
+    c.progress ??= {};
     return c;
   } catch {
     return null;

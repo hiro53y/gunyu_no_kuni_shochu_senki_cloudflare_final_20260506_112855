@@ -1,10 +1,11 @@
 // 画面の切り替え：タイトル → 本陣（国盗り） → 合戦（城攻め・迎撃・妖魔討伐） → 結果 → 本陣
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Campaign, Invasion, Placement, Scene, Settings } from './campaign/state';
-import { abortSortie, beginBattle, finishBattle, forts, newCampaign, type Report } from './campaign/campaign';
+import { abortSortie, beginBattle, finishBattle, newCampaign, type Report } from './campaign/campaign';
+import { LAND_NAME } from './campaign/army';
 import { createBattle } from './battle/engine';
 import type { Battle, BattleKind } from './battle/types';
-import { regionDef } from './content/sengoku';
+import { FACTIONS, regionDef } from './content/sengoku';
 import { loadBattle, loadCampaign, loadSettings, loadSnapshot, saveBattle, saveCampaign, saveSettings, saveSnapshot } from './engine/save';
 import { setBgmVolume, trackUrl, useBgm, type Track } from './audio/bgm';
 import { setSeVolume } from './audio/sound';
@@ -25,12 +26,19 @@ function clone<T>(v: T): T {
 function battleTitle(c: Campaign, b: Battle): string {
   const r = regionDef(b.region);
   if (b.kind === 'siege') {
-    const total = forts(b.region);
-    const no = c.regions[b.region].taken + 1;
-    return `${r.name}・${no >= total ? '本城' : `砦${no}/${total}`}`;
+    const rs = c.regions[b.region];
+    const no = rs.taken + 1;
+    return `${r.name}・${LAND_NAME[rs.lands[rs.taken] ?? 'castle']}${no}/${rs.lands.length}`;
   }
   if (b.kind === 'defense') return `${r.name}・迎撃`;
   return `${r.name}・妖魔討伐`;
+}
+
+/** 合戦の左右の色（味方は暁ノ家、敵は相手の勢力） */
+function battleColors(c: Campaign, b: Battle): { L: string; R: string } {
+  const so = c.sortie;
+  const enemy = so?.invasion?.faction ?? (b.kind === 'hunt' ? 'youma' : c.regions[b.region]?.owner ?? 'youma');
+  return { L: FACTIONS.akatsuki.color, R: enemy === 'akatsuki' ? '#5a5e6a' : FACTIONS[enemy].color === '#2a1a2e' ? '#6a3a7a' : FACTIONS[enemy].color };
 }
 
 export default function App() {
@@ -126,12 +134,12 @@ export default function App() {
 
   let body: React.ReactNode;
   if (screen === 'battle' && battle && c) {
-    body = <BattleScreen key={battle.seed} b={battle} title={battleTitle(c, battle)} settings={settings} onSettings={setSettings} onEnd={() => endBattle(battle)} />;
+    body = <BattleScreen key={battle.seed} b={battle} title={battleTitle(c, battle)} colors={battleColors(c, battle)} settings={settings} onSettings={setSettings} onEnd={() => endBattle(battle)} />;
   } else if (screen === 'result' && report && c) {
     body = <ResultScreen c={c} rep={report} onBack={() => { setReport(null); setScreen('honjin'); changed(); }} />;
   } else if (screen === 'honjin' && c) {
     body = (
-      <Honjin c={c} settings={settings} onSettings={setSettings} onChange={changed} onScene={onScene} onDepart={onDepart} onTitle={() => setScreen('title')} />
+      <Honjin c={c} settings={settings} onSettings={setSettings} onChange={changed} onScene={onScene} onDepart={onDepart} onReport={(rep) => { saveCampaign(c); setReport(rep); setScreen('result'); }} onTitle={() => setScreen('title')} />
     );
   } else {
     body = (
@@ -144,8 +152,8 @@ export default function App() {
       {body}
       {scene && c && <SceneView c={c} scene={scene} onDone={() => { c.scenes.shift(); changed(); }} />}
       {!scene && screen === 'honjin' && c?.defeat && (
-        <Modal title="落城">
-          <p>本拠の暁原を失い、暁ノ家は滅びた……</p>
+        <Modal title={c.defeatReason === 'lord' ? '暁、落つ' : '落城'}>
+          <p>{c.defeatReason === 'lord' ? '当主・朔の部隊が壊滅し、暁ノ家は瓦解した……' : '本拠の暁原を失い、暁ノ家は滅びた……'}</p>
           <div className="row-buttons col">
             <button className="primary" onClick={() => {
               const snap = loadSnapshot();
