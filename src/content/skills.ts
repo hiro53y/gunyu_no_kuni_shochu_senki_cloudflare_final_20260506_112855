@@ -1,4 +1,4 @@
-// 武将の技（迷宮の中で使う）。効果は engine/skills.ts
+// 武将の固有技（合戦用には battle/kinds.ts の fromUnique で変換する）
 
 export type SkillKind =
   /** 前の一直線 n マスの敵をまとめて斬る */

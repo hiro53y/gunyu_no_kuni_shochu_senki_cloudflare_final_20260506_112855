@@ -1,13 +1,14 @@
-// 本陣：八洲の地図・国の情報・出陣／修行／内政／交流・城下・武将・ターンの終わり・攻めてきた敵・捕らえた将
+// 本陣：八洲の地図・国の情報・出陣／妖魔討伐／内政／交流・城下・武将・ターンの終わり・攻めてきた敵・捕らえた将
 import { useState } from 'react';
 import { FACTIONS, TERRAIN_NAME, regionDef, turnLabel } from '../content/sengoku';
-import type { Campaign, Invasion, Scene, Settings } from '../campaign/state';
+import type { Campaign, Invasion, Placement, Scene, Settings } from '../campaign/state';
 import {
-  MAX_AP, TITLES, canAttack, castleDanger, defensePower, devCost, devError, develop, endTurn, genInfo, holdCastle, holdOdds, income, ownedCount,
+  MAX_AP, TITLES, canAttack, castleDanger, defensePower, devCost, devError, develop, endTurn, forts, genInfo, holdCastle, holdOdds, income, lordLv, ownedCount,
   readyGenerals, recruit, regionLeaders, release, takeInvasion, type DevKind,
 } from '../campaign/campaign';
-import type { RunMode } from '../engine/types';
-import { bustUrl, tokenUrl } from '../render/sprites';
+import type { BattleKind } from '../battle/types';
+import { KINDS } from '../battle/kinds';
+import { bustUrl, tokenUrl } from './common';
 import { YashimaMap } from './YashimaMap';
 import { Formation } from './Formation';
 import { GeneralsPanel } from './Generals';
@@ -24,14 +25,15 @@ export interface HonjinProps {
   /** 本陣の状態が変わった（保存して描き直す） */
   onChange: () => void;
   onScene: (s: Scene) => void;
-  onDepart: (mode: RunMode, region: string, party: string[], carry: number[], inv?: Invasion) => void;
+  onDepart: (mode: BattleKind, region: string, party: Placement[], seed: number, inv?: Invasion) => void;
   onTitle: () => void;
 }
 
 /** 城の強さと朔の Lv の比べ（目安） */
 function threat(c: Campaign, rid: string): { label: string; cls: string } {
-  const d = castleDanger(c, rid) + (regionDef(rid).floors - 3);
-  const power = c.lord.lv + readyGenerals(c).slice(0, 2).reduce((s, g) => s + g.lv, 0) / 4;
+  const d = castleDanger(c, rid) + Math.floor(c.regions[rid].taken / 2);
+  const others = readyGenerals(c).filter((g) => g.id !== 'g_saku').sort((a, b) => b.lv - a.lv).slice(0, 5);
+  const power = lordLv(c) + others.reduce((s, g) => s + g.lv, 0) / 8;
   const k = power - d;
   if (k >= 4) return { label: '楽', cls: 'easy' };
   if (k >= 0) return { label: '互角', cls: 'even' };
@@ -42,7 +44,8 @@ function threat(c: Campaign, rid: string): { label: string; cls: string } {
 export function Honjin({ c, settings, onSettings, onChange, onScene, onDepart, onTitle }: HonjinProps) {
   const [sel, setSel] = useState<string | null>('01');
   const [modal, setModal] = useState<null | 'gens' | 'town' | 'news' | 'menu' | 'help' | 'settings' | 'titles' | 'dev' | 'end'>(null);
-  const [form, setForm] = useState<{ mode: RunMode; region: string; inv?: Invasion } | null>(null);
+  const [form, setForm] = useState<{ mode: BattleKind; region: string; inv?: Invasion; seed: number } | null>(null);
+  const newSeed = () => (Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) | 0;
   const [toast, setToast] = useState('');
   const r = sel ? regionDef(sel) : null;
   const rs = sel ? c.regions[sel] : null;
@@ -87,7 +90,7 @@ export function Honjin({ c, settings, onSettings, onChange, onScene, onDepart, o
             <>
               <p className="rp-stats">年貢 {Math.round(r.income * (1 + 0.3 * (rs.dev - 1)))}文・開発{rs.dev}・城{rs.wall}・兵{rs.troops}（守り{defensePower(c, r.id)}）</p>
               <div className="row-buttons">
-                <button disabled={c.ap <= 0} onClick={() => { playSe('menu'); setForm({ mode: 'hunt', region: r.id }); }}>修行<small>妖魔の巣</small></button>
+                <button disabled={c.ap <= 0} onClick={() => { playSe('menu'); setForm({ mode: 'hunt', region: r.id, seed: newSeed() }); }}>妖魔討伐<small>経験と文</small></button>
                 <button disabled={c.ap <= 0} onClick={() => { playSe('menu'); setModal('dev'); }}>内政<small>開発・城・兵</small></button>
               </div>
             </>
@@ -104,10 +107,11 @@ export function Honjin({ c, settings, onSettings, onChange, onScene, onDepart, o
                   );
                 })}
               </div>
-              <p className="rp-stats">{r.floors}階の城・強さ{castleDanger(c, r.id)}{rs.breach ? `・城門${rs.breach}階まで破った` : ''}　<span className={`threat ${threat(c, r.id).cls}`}>{threat(c, r.id).label}</span></p>
+              <p className="rp-stats">砦 {rs.taken}/{forts(r.id)} を落とした・強さ{castleDanger(c, r.id)}　<span className={`threat ${threat(c, r.id).cls}`}>{threat(c, r.id).label}</span></p>
+              <p className="rp-desc">兵種：{FACTIONS[rs.owner].troops.map(([k]) => KINDS[k].name).join('・')}{rs.taken + 1 >= forts(r.id) ? '　次は本城（城主が出る）' : ''}</p>
               <p className="rp-desc">{r.desc}</p>
               <div className="row-buttons">
-                <button className="primary" disabled={!canAttack(c, r.id) || c.ap <= 0} onClick={() => { playSe('menu'); setForm({ mode: 'siege', region: r.id }); }}>
+                <button className="primary" disabled={!canAttack(c, r.id) || c.ap <= 0} onClick={() => { playSe('menu'); setForm({ mode: 'siege', region: r.id, seed: newSeed() }); }}>
                   攻める（行動1）{!canAttack(c, r.id) ? <small>自分の国の隣ではない</small> : c.ap <= 0 ? <small>行動が残っていない</small> : null}
                 </button>
               </div>
@@ -117,7 +121,7 @@ export function Honjin({ c, settings, onSettings, onChange, onScene, onDepart, o
       )}
       <nav className="hj-commands">
         <button onClick={() => { playSe('menu'); setModal('gens'); }}>武将<small>{readyGenerals(c).length}人</small></button>
-        <button onClick={() => { playSe('menu'); setModal('town'); }}>城下<small>蔵・商人</small></button>
+        <button onClick={() => { playSe('menu'); setModal('town'); }}>城下<small>補充・浪人</small></button>
         <button onClick={() => { playSe('menu'); setModal('news'); }}>記録</button>
         <button className={`end-turn ${c.ap === 0 ? 'pulse' : ''}`} onClick={() => { playSe('menu'); setModal('end'); }}>季節を<br />進める</button>
       </nav>
@@ -128,8 +132,10 @@ export function Honjin({ c, settings, onSettings, onChange, onScene, onDepart, o
           c={c}
           mode={form.mode}
           region={form.region}
+          seed={form.seed}
+          inv={form.inv}
           onClose={() => setForm(null)}
-          onGo={(party, carry) => { const f = form; setForm(null); if (f.inv) takeInvasion(c, f.inv); onDepart(f.mode, f.region, party, carry, f.inv); }}
+          onGo={(party) => { const f = form; setForm(null); if (f.inv) takeInvasion(c, f.inv); onDepart(f.mode, f.region, party, f.seed, f.inv); }}
         />
       )}
       {modal === 'gens' && <GeneralsPanel c={c} onChange={onChange} onScene={onScene} onClose={() => setModal(null)} />}
@@ -151,7 +157,7 @@ export function Honjin({ c, settings, onSettings, onChange, onScene, onDepart, o
       )}
       {modal === 'news' && (
         <Modal title="記録" onClose={() => setModal(null)} className="log-modal">
-          <p className="note">年貢 毎季 {income(c).toLocaleString()}文・戦 {c.stats.battles}（勝ち{c.stats.wins}）・討ち取った将 {c.stats.captured}・朔 Lv{c.lord.lv}</p>
+          <p className="note">年貢 毎季 {income(c).toLocaleString()}文・戦 {c.stats.battles}（勝ち{c.stats.wins}）・捕らえた将 {c.stats.captured}・討った敵兵 {c.stats.kills.toLocaleString()}・朔 Lv{lordLv(c)}</p>
           <button className="small" onClick={() => setModal('titles')}>称号を見る</button>
           <div className="log-list">{[...c.news].reverse().map((n, i) => <div key={i} className={`msg ${n.c ?? ''}`}><small>{turnLabel(n.turn)}</small> {n.t}</div>)}</div>
         </Modal>
@@ -197,7 +203,7 @@ export function Honjin({ c, settings, onSettings, onChange, onScene, onDepart, o
           <p className="rp-stats">敵の攻め {inv.power}　対　守り {defensePower(c, inv.to)}（籠城で守れる見込み {Math.round(holdOdds(c, inv) * 100)}%）</p>
           {inv.to === '01' && <p className="bad">暁原を失うと、暁ノ家は滅びます。</p>}
           <div className="row-buttons col">
-            <button className="primary" onClick={() => { playSe('menu'); setForm({ mode: 'defense', region: inv.to, inv }); }}>自ら迎え撃つ<small>合戦で大将を討てば勝ち（行動は使わない）</small></button>
+            <button className="primary" onClick={() => { playSe('menu'); setForm({ mode: 'defense', region: inv.to, inv, seed: newSeed() }); }}>自ら迎え撃つ<small>合戦に勝てば守れる（行動は使わない）</small></button>
             <button onClick={() => { playSe('menu'); const res = holdCastle(c, inv); onChange(); flash(res.text); }}>籠城して守将に任せる<small>見込み {Math.round(holdOdds(c, inv) * 100)}%</small></button>
           </div>
         </Modal>
@@ -217,7 +223,7 @@ function CaptiveModal({ c, id, onRecruit, onRelease }: { c: Campaign; id: string
         <img className="captive-bust" src={bustUrl(info.portrait)} alt="" />
         <div>
           <b>{info.name}</b>
-          <p className="stats">{info.role}・Lv{c.gens[id].lv}</p>
+          <p className="stats">{info.role}・{KINDS[c.gens[id].kind].name}・Lv{c.gens[id].lv}</p>
           <p className="stats">統{info.cmd} 武{info.pow} 知{info.int}</p>
           <p className="desc">{info.desc}</p>
         </div>

@@ -1,34 +1,42 @@
-// 画面の切り替え：タイトル → 本陣（国盗り） → 冒険（城攻め・合戦・修行） → 結果 → 本陣
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Campaign, Invasion, Scene, Settings } from './campaign/state';
-import { abortSortie, depart, finishSortie, newCampaign, type Report } from './campaign/campaign';
-import { createRun } from './engine/run';
-import { loadCampaign, loadRun, loadSettings, loadSnapshot, saveCampaign, saveRun, saveSettings, saveSnapshot } from './engine/save';
-import type { Run, RunMode } from './engine/types';
+// 画面の切り替え：タイトル → 本陣（国盗り） → 合戦（城攻め・迎撃・妖魔討伐） → 結果 → 本陣
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { Campaign, Invasion, Placement, Scene, Settings } from './campaign/state';
+import { abortSortie, beginBattle, finishBattle, forts, newCampaign, type Report } from './campaign/campaign';
+import { createBattle } from './battle/engine';
+import type { Battle, BattleKind } from './battle/types';
+import { regionDef } from './content/sengoku';
+import { loadBattle, loadCampaign, loadSettings, loadSnapshot, saveBattle, saveCampaign, saveSettings, saveSnapshot } from './engine/save';
 import { setBgmVolume, trackUrl, useBgm, type Track } from './audio/bgm';
 import { setSeVolume } from './audio/sound';
-import { GameScreen } from './ui/GameScreen';
+import { BattleScreen } from './ui/BattleScreen';
 import { Honjin } from './ui/Honjin';
 import { SceneView } from './ui/SceneView';
 import { ResultScreen, TitleScreen } from './ui/TitleResult';
 import { HelpBody } from './ui/Help';
 import { SettingsBody } from './ui/SettingsPanel';
-import { Modal, useSpritesReady } from './ui/common';
+import { Modal } from './ui/common';
 
-type Screen = 'title' | 'honjin' | 'game' | 'result';
-
-// 開発用の絵の一覧（本番のビルドでは読み込まない）
-const Gallery = import.meta.env.DEV ? lazy(() => import('./ui/Gallery')) : null;
+type Screen = 'title' | 'honjin' | 'battle' | 'result';
 
 function clone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v)) as T;
 }
 
+function battleTitle(c: Campaign, b: Battle): string {
+  const r = regionDef(b.region);
+  if (b.kind === 'siege') {
+    const total = forts(b.region);
+    const no = c.regions[b.region].taken + 1;
+    return `${r.name}・${no >= total ? '本城' : `砦${no}/${total}`}`;
+  }
+  if (b.kind === 'defense') return `${r.name}・迎撃`;
+  return `${r.name}・妖魔討伐`;
+}
+
 export default function App() {
-  const ready = useSpritesReady();
   const [settings, setSettingsState] = useState<Settings>(() => loadSettings());
   const [c, setC] = useState<Campaign | null>(() => loadCampaign());
-  const [run, setRun] = useState<Run | null>(() => loadRun());
+  const [battle, setBattle] = useState<Battle | null>(() => loadBattle());
   const [screen, setScreen] = useState<Screen>('title');
   const [report, setReport] = useState<Report | null>(null);
   const [panel, setPanel] = useState<null | 'help' | 'settings'>(null);
@@ -51,8 +59,8 @@ export default function App() {
 
   const bgm: Track | null = useMemo(() => {
     if (screen === 'title') return 'title';
-    if (screen === 'game') return 'battle';
-    if (screen === 'result') return report?.kind === 'win' ? 'victory' : report?.kind === 'lose' ? 'defeat' : 'map';
+    if (screen === 'battle') return 'battle';
+    if (screen === 'result') return report?.kind === 'win' ? 'victory' : 'defeat';
     if (c?.defeat) return 'defeat';
     return 'map';
   }, [screen, report, c?.defeat]);
@@ -61,14 +69,14 @@ export default function App() {
   // 開発中の確認用
   useEffect(() => {
     if (!import.meta.env.DEV) return;
-    (window as unknown as { __camp: unknown }).__camp = { get: () => c, refresh: () => setVersion((v) => v + 1), save: () => c && saveCampaign(c) };
-  }, [c]);
+    (window as unknown as { __camp: unknown }).__camp = { get: () => c, battle: () => battle, refresh: () => setVersion((v) => v + 1), save: () => c && saveCampaign(c) };
+  }, [c, battle]);
 
   const startNew = () => {
     const seed = (Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) | 0;
     const next = newCampaign(seed);
-    saveRun(null);
-    setRun(null);
+    saveBattle(null);
+    setBattle(null);
     saveCampaign(next);
     saveSnapshot(clone(next));
     snapTurn.current = next.turn;
@@ -76,43 +84,36 @@ export default function App() {
     setScreen('honjin');
   };
 
+  const endBattle = useCallback((b: Battle) => {
+    if (!c) return;
+    const rep = finishBattle(c, b);
+    saveBattle(null);
+    setBattle(null);
+    saveCampaign(c);
+    setReport(rep);
+    setScreen('result');
+  }, [c]);
+
   const onContinue = () => {
     if (!c) return;
     if (c.sortie) {
-      if (run && !run.end) { setScreen('game'); return; }
-      if (run && run.end) { endRun(run); return; }
+      if (battle && !battle.end) { setScreen('battle'); return; }
+      if (battle && battle.end) { endBattle(battle); return; }
       abortSortie(c);
       saveCampaign(c);
     }
     setScreen('honjin');
   };
 
-  const onDepart = (mode: RunMode, region: string, party: string[], carry: number[], inv?: Invasion) => {
+  const onDepart = (mode: BattleKind, region: string, party: Placement[], seed: number, inv?: Invasion) => {
     if (!c) return;
-    const seed = (Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) | 0;
-    const spec = depart(c, mode, region, { party, carry }, seed, inv);
-    const next = createRun(spec);
+    const spec = beginBattle(c, mode, region, party, seed, inv);
+    const next = createBattle(spec);
     saveCampaign(c);
-    saveRun(next);
-    setRun(next);
-    setScreen('game');
+    saveBattle(next);
+    setBattle(next);
+    setScreen('battle');
   };
-
-  const endRun = useCallback((r: Run) => {
-    if (!c) return;
-    const rep = finishSortie(c, r);
-    saveRun(null);
-    setRun(null);
-    saveCampaign(c);
-    setReport(rep);
-    setScreen('result');
-  }, [c]);
-
-  const giveUp = useCallback(() => {
-    if (!run) return;
-    run.end = { kind: 'quit', cause: '退却', floor: run.floorNo };
-    endRun(run);
-  }, [run, endRun]);
 
   const onScene = (s: Scene) => {
     if (!c) return;
@@ -120,15 +121,12 @@ export default function App() {
     changed();
   };
 
-  if (!ready) return <div className="loading">陣を敷いています……</div>;
-  if (Gallery && location.search.includes('gallery')) return <Suspense fallback={null}><Gallery /></Suspense>;
-
-  // できごと（会話）は、本陣と結果の上に重ねて順に見せる
-  const scene = c && (screen === 'honjin') && c.scenes.length ? c.scenes[0] : null;
+  // できごと（会話）は、本陣の上に重ねて順に見せる
+  const scene = c && screen === 'honjin' && c.scenes.length ? c.scenes[0] : null;
 
   let body: React.ReactNode;
-  if (screen === 'game' && run && c) {
-    body = <GameScreen key={run.seed} run={run} settings={settings} onSettings={setSettings} onEnd={() => endRun(run)} onSuspend={() => setScreen('title')} onGiveUp={giveUp} />;
+  if (screen === 'battle' && battle && c) {
+    body = <BattleScreen key={battle.seed} b={battle} title={battleTitle(c, battle)} settings={settings} onSettings={setSettings} onEnd={() => endBattle(battle)} />;
   } else if (screen === 'result' && report && c) {
     body = <ResultScreen c={c} rep={report} onBack={() => { setReport(null); setScreen('honjin'); changed(); }} />;
   } else if (screen === 'honjin' && c) {

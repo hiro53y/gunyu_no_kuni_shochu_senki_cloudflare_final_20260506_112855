@@ -1,5 +1,6 @@
 // 武将（固有22名と、名もなき侍大将）。名前・設定・台詞はすべて独自
 import type { FactionId } from './sengoku';
+import type { Kind } from '../battle/types';
 
 /** 台詞の1行：[話す人の武将ID（'' は地の文）, 文] */
 export type Line = [string, string];
@@ -25,6 +26,8 @@ export interface GenDef {
   /** 技（2つ目は絆が深まると使える） */
   skills: [string, string];
   style: FightStyle;
+  /** 合戦の兵種 */
+  kind: Kind;
   /** 妖魔（霊に効く技が効く） */
   youkai?: boolean;
   /** 登用できない */
@@ -45,14 +48,14 @@ export const GENERALS: GenDef[] = [
   // ── 暁ノ家 ──
   {
     id: 'g_saku', name: '風間 朔', short: '朔', reading: 'かざま さく', faction: 'akatsuki', role: '当主・剣士', portrait: 'akatsuki_saku',
-    cmd: 75, pow: 88, int: 60, cha: 82, skills: ['issen', 'kyouzaki'], style: 'melee',
+    cmd: 75, pow: 88, int: 60, cha: 82, skills: ['issen', 'kyouzaki'], style: 'melee', kind: 'bushi',
     desc: '暁ノ家の若き当主。口は悪いが誰より前に出る。剣の冴えは常人離れしている。',
     intro: '', defeat: '', join: '',
     bond: [],
   },
   {
     id: 'g_suzuran', name: '鈴蘭', short: '鈴蘭', reading: 'すずらん', faction: 'akatsuki', role: '巫女', portrait: 'akatsuki_suzuran',
-    cmd: 60, pow: 35, int: 78, cha: 90, skills: ['harai', 'kanagi'], style: 'melee',
+    cmd: 60, pow: 35, int: 78, cha: 90, skills: ['harai', 'kanagi'], style: 'melee', kind: 'miko',
     desc: '朔の幼い頃からの世話係。巫女の家の生まれで、癒しと祓いの術を使う。朔にだけは容赦がない。',
     intro: '', defeat: '', join: '',
     bond: [
@@ -74,7 +77,7 @@ export const GENERALS: GenDef[] = [
   },
   {
     id: 'g_chikage', name: '朝霧 千景', short: '千景', reading: 'あさぎり ちかげ', faction: 'akatsuki', role: '軍師', portrait: 'akatsuki_chikage',
-    cmd: 82, pow: 50, int: 92, cha: 70, skills: ['sakubou', 'kobu'], style: 'melee',
+    cmd: 82, pow: 50, int: 92, cha: 70, skills: ['sakubou', 'kobu'], style: 'melee', kind: 'gunshi',
     desc: '朔の従姉で暁ノ家の軍師。冷静沈着。扇の陰でいつも三手先を読んでいる。',
     intro: '', defeat: '', join: '',
     bond: [
@@ -96,7 +99,7 @@ export const GENERALS: GenDef[] = [
   },
   {
     id: 'g_genba', name: '風間 玄蕃', short: '玄蕃', reading: 'かざま げんば', faction: 'akatsuki', role: '宿老・盾', portrait: 'akatsuki_genba',
-    cmd: 78, pow: 75, int: 65, cha: 60, skills: ['teppeki', 'konshin'], style: 'reach', lvBonus: 1,
+    cmd: 78, pow: 75, int: 65, cha: 60, skills: ['teppeki', 'konshin'], style: 'reach', kind: 'ashigaru', lvBonus: 1,
     desc: '先代から仕える宿老。朔の大叔父。槍と盾で家を支えてきた老将。',
     intro: '', defeat: '', join: '',
     bond: [
@@ -117,7 +120,7 @@ export const GENERALS: GenDef[] = [
   // ── 黒鉄家 ──
   {
     id: 'g_genbu', name: '黒鉄 玄武', short: '玄武', reading: 'くろがね げんぶ', faction: 'kurogane', role: '黒鉄家当主', portrait: 'kurogane_genbu',
-    cmd: 85, pow: 80, int: 75, cha: 70, skills: ['tetsuyari', 'kokkou'], style: 'reach', loyal: true,
+    cmd: 85, pow: 80, int: 75, cha: 70, skills: ['tetsuyari', 'kokkou'], style: 'reach', kind: 'ashigaru', loyal: true,
     desc: '黒鉄家当主。鉱山と鉄砲を背に東を治める。力こそが民を守ると信じている。',
     intro: '玄武「小僧が。鉄の重さを教えてやる」',
     defeat: '玄武「……鉄より硬い剣か。見事だ」',
@@ -140,7 +143,7 @@ export const GENERALS: GenDef[] = [
   },
   {
     id: 'g_hayato', name: '銅崎 隼人', short: '隼人', reading: 'あかがねざき はやと', faction: 'kurogane', role: '鉄砲頭', portrait: 'kurogane_hayato',
-    cmd: 70, pow: 78, int: 70, cha: 55, skills: ['isseisha', 'sogeki'], style: 'gun',
+    cmd: 70, pow: 78, int: 70, cha: 55, skills: ['isseisha', 'sogeki'], style: 'gun', kind: 'teppo',
     desc: '黒鉄家の鉄砲頭。口数は少ないが、狙った的は外さない。',
     intro: '隼人「……撃て」',
     defeat: '隼人「弾が……届かなかった」',
@@ -162,7 +165,7 @@ export const GENERALS: GenDef[] = [
   },
   {
     id: 'g_narukami', name: '鋼鉄 鳴雷', short: '鳴雷', reading: 'はがね なるかみ', faction: 'kurogane', role: '黒鉄家筆頭武将', portrait: 'kurogane_narukami',
-    cmd: 75, pow: 92, int: 60, cha: 65, skills: ['raijin', 'gouda'], style: 'melee', loyal: true,
+    cmd: 75, pow: 92, int: 60, cha: 65, skills: ['raijin', 'gouda'], style: 'melee', kind: 'bushi', loyal: true,
     desc: '黒鉄家の筆頭武将。雷の鳴る峠で生まれ、雷のように戦う。',
     intro: '鳴雷「がっはっは！ 雷鳴峠へようこそ、暁の小僧！」',
     defeat: '鳴雷「ぐっ……！ 雷より速い剣があるとはな！」',
@@ -185,7 +188,7 @@ export const GENERALS: GenDef[] = [
   // ── 紫苑家 ──
   {
     id: 'g_hazuki', name: '紫苑院 葉月', short: '葉月', reading: 'しおんいん はづき', faction: 'shion', role: '紫苑家当主', portrait: 'shion_hazuki',
-    cmd: 80, pow: 50, int: 92, cha: 88, skills: ['sandan', 'baishuu'], style: 'bow', loyal: true,
+    cmd: 80, pow: 50, int: 92, cha: 88, skills: ['sandan', 'baishuu'], style: 'bow', kind: 'gunshi', loyal: true,
     desc: '紫苑家の若き女当主。商才と冷徹さで湊を富ませた。損な取引は決してしない。',
     intro: '葉月「いくらで退いてくださるの？ ……そう、値の付かない方なのね」',
     defeat: '葉月「計算違い……あなた、損得で動かないのね」',
@@ -208,7 +211,7 @@ export const GENERALS: GenDef[] = [
   },
   {
     id: 'g_fuuko', name: '紫苑院 楓子', short: '楓子', reading: 'しおんいん ふうこ', faction: 'shion', role: '海賊頭', portrait: 'shion_fuuko',
-    cmd: 70, pow: 82, int: 65, cha: 75, skills: ['kairikutachi', 'ryakudatsu'], style: 'melee',
+    cmd: 70, pow: 82, int: 65, cha: 75, skills: ['kairikutachi', 'ryakudatsu'], style: 'melee', kind: 'bushi',
     desc: '葉月の妹。家を飛び出して海賊頭になった。豪快で、よく笑う。',
     intro: '楓子「あははっ！ 陸の侍が潮咲に何の用？ 獲物は早い者勝ちだよ！」',
     defeat: '楓子「参った参った！ あんた、海でも生きていけるね！」',
@@ -228,7 +231,7 @@ export const GENERALS: GenDef[] = [
   },
   {
     id: 'g_souji', name: '鳴海 蒼司', short: '蒼司', reading: 'なるみ そうじ', faction: 'shion', role: '知将', portrait: 'shion_souji',
-    cmd: 72, pow: 55, int: 88, cha: 60, skills: ['sakuryaku', 'chouhatsu'], style: 'bow',
+    cmd: 72, pow: 55, int: 88, cha: 60, skills: ['sakuryaku', 'chouhatsu'], style: 'bow', kind: 'gunshi',
     desc: '紫苑家の知将。眼鏡の奥で策を巡らせる。書物と算盤が友。',
     intro: '蒼司「計算どおりなら、あなたはここで詰みです」',
     defeat: '蒼司「計算の外……。興味深い」',
@@ -249,7 +252,7 @@ export const GENERALS: GenDef[] = [
   // ── 白鷺家 ──
   {
     id: 'g_toshiro', name: '白鷺 凍司朗', short: '凍司朗', reading: 'しらさぎ とうしろう', faction: 'shirasagi', role: '白鷺家当主', portrait: 'shirasagi_toshiro',
-    cmd: 88, pow: 85, int: 78, cha: 75, skills: ['hyouga', 'shinsoku'], style: 'melee', loyal: true, lvBonus: 1,
+    cmd: 88, pow: 85, int: 78, cha: 75, skills: ['hyouga', 'shinsoku'], style: 'melee', kind: 'bushi', loyal: true, lvBonus: 1,
     desc: '白鷺家の当主。古き武家の誇りを体現する老剣士。',
     intro: '凍司朗「白鷺の嶺に、土足で上がるか。若造」',
     defeat: '凍司朗「……老いたな。いや、そなたが速すぎるのか」',
@@ -270,7 +273,7 @@ export const GENERALS: GenDef[] = [
   },
   {
     id: 'g_rin', name: '鷹羽 燐', short: '燐', reading: 'たかば りん', faction: 'shirasagi', role: '弓の名手', portrait: 'shirasagi_rin',
-    cmd: 70, pow: 88, int: 62, cha: 70, skills: ['sanya', 'yougan'], style: 'bow',
+    cmd: 70, pow: 88, int: 62, cha: 70, skills: ['sanya', 'yougan'], style: 'bow', kind: 'yumi',
     desc: '白鷺家の弓の名手。鷹のような眼で、雪煙の向こうの的も射抜く。',
     intro: '燐「動かないで。外したくないから」',
     defeat: '燐「……矢が尽きた。あなたの勝ち」',
@@ -290,7 +293,7 @@ export const GENERALS: GenDef[] = [
   },
   {
     id: 'g_shizune', name: '雪見 静音', short: '静音', reading: 'ゆきみ しずね', faction: 'shirasagi', role: '騎馬隊長', portrait: 'shirasagi_shizune',
-    cmd: 75, pow: 82, int: 60, cha: 72, skills: ['totsugeki', 'yukigake'], style: 'reach',
+    cmd: 75, pow: 82, int: 60, cha: 72, skills: ['totsugeki', 'yukigake'], style: 'reach', kind: 'kiba',
     desc: '白鷺家の騎馬隊長。銀の髪をなびかせ、雪原を誰より速く駆ける。',
     intro: '静音「雪見野を駆け抜けられると思わないで」',
     defeat: '静音「雪に足を取られたのは……私の方だったのね」',
@@ -312,7 +315,7 @@ export const GENERALS: GenDef[] = [
   // ── 焔ノ家 ──
   {
     id: 'g_kurenai', name: '焔 紅葉', short: '紅葉', reading: 'ほのお くれない', faction: 'honoo', role: '焔ノ家当主・巫女', portrait: 'honoo_kurenai',
-    cmd: 78, pow: 60, int: 85, cha: 92, skills: ['kaenjin', 'shinka'], style: 'bow', loyal: true,
+    cmd: 78, pow: 60, int: 85, cha: 92, skills: ['kaenjin', 'shinka'], style: 'bow', kind: 'onmyo', loyal: true,
     desc: '焔ノ家の当主で、火山の神に仕える巫女。炎の術を操り、民からは生き神と慕われる。',
     intro: '紅葉「神火を穢す者は、灰になって去りなさい」',
     defeat: '紅葉「神火が……あなたを認めた……？」',
@@ -334,7 +337,7 @@ export const GENERALS: GenDef[] = [
   },
   {
     id: 'g_tomoshibi', name: '焔 燈火', short: '燈火', reading: 'ほのお ともしび', faction: 'honoo', role: '火槍使い', portrait: 'honoo_tomoshibi',
-    cmd: 60, pow: 80, int: 55, cha: 70, skills: ['hiyari', 'honoonagi'], style: 'reach',
+    cmd: 60, pow: 80, int: 55, cha: 70, skills: ['hiyari', 'honoonagi'], style: 'reach', kind: 'teppo',
     desc: '紅葉の弟。火を噴く槍を振るう熱血漢。姉には頭が上がらない。',
     intro: '燈火「姉上には指一本触れさせない！ 燃えろぉぉ！」',
     defeat: '燈火「くそっ……！ 俺の炎が、消えた……」',
@@ -356,7 +359,7 @@ export const GENERALS: GenDef[] = [
   // ── 蓮華院 ──
   {
     id: 'g_kangetsu', name: '蓮華院 観月', short: '観月', reading: 'れんげいん かんげつ', faction: 'rengein', role: '蓮華院大導師', portrait: 'rengein_kangetsu',
-    cmd: 82, pow: 45, int: 95, cha: 90, skills: ['kekkai', 'jouka'], style: 'bow', loyal: true,
+    cmd: 82, pow: 45, int: 95, cha: 90, skills: ['kekkai', 'jouka'], style: 'bow', kind: 'miko', loyal: true,
     desc: '蓮華院の大導師。妖魔調伏の中心となる尼僧。穏やかだが、芯は鋼のよう。',
     intro: '観月「争いは何も生みません。……ですが、退けぬ時もあります」',
     defeat: '観月「あなたの剣に、迷いがありませんでした」',
@@ -377,7 +380,7 @@ export const GENERALS: GenDef[] = [
   },
   {
     id: 'g_tesshin', name: '法蓮坊 鉄心', short: '鉄心', reading: 'ほうれんぼう てっしん', faction: 'rengein', role: '武僧', portrait: 'rengein_tesshin',
-    cmd: 75, pow: 88, int: 60, cha: 65, skills: ['choubuku', 'kongousho'], style: 'melee',
+    cmd: 75, pow: 88, int: 60, cha: 65, skills: ['choubuku', 'kongousho'], style: 'melee', kind: 'sohei',
     desc: '蓮華院の武僧。金剛杵を振るい、妖魔を打ち払う。大食らい。',
     intro: '鉄心「喝ッ！ 千歳森に何用か、若造！」',
     defeat: '鉄心「ぬうっ……拙僧の修行が足りなんだか！」',
@@ -398,7 +401,7 @@ export const GENERALS: GenDef[] = [
   // ── 妖魔の群 ──
   {
     id: 'g_kurobuchi', name: '蛟王 黒淵', short: '黒淵', reading: 'こうおう くろぶち', faction: 'youma', role: '妖魔の首領', portrait: 'youma_kurobuchi',
-    cmd: 95, pow: 95, int: 85, cha: 0, skills: ['kokumu', 'mizuchi'], style: 'melee', youkai: true, never: true, lvBonus: 4,
+    cmd: 95, pow: 95, int: 85, cha: 0, skills: ['kokumu', 'mizuchi'], style: 'melee', kind: 'onmyo', youkai: true, never: true, lvBonus: 4,
     desc: '黄泉沼の底から現れた妖魔の首領。人の憎しみを喰らい、八洲を黒い霧で覆おうとしている。',
     intro: '黒淵「小さき人の子よ。お前の憎しみは、さぞ甘かろう」',
     defeat: '黒淵「馬鹿な……憎しみ無き刃が、我を……！」',
@@ -407,7 +410,7 @@ export const GENERALS: GenDef[] = [
   },
   {
     id: 'g_guren', name: '夜叉姫 紅蓮', short: '紅蓮', reading: 'やしゃひめ ぐれん', faction: 'youma', role: '黒淵の側近', portrait: 'youma_guren',
-    cmd: 80, pow: 90, int: 70, cha: 70, skills: ['gurenmai', 'kyuuketsu'], style: 'melee', youkai: true,
+    cmd: 80, pow: 90, int: 70, cha: 70, skills: ['gurenmai', 'kyuuketsu'], style: 'melee', kind: 'onmyo', youkai: true,
     desc: '黒淵に仕える夜叉の姫。気まぐれで、強い者にしか興味がない。',
     intro: '紅蓮「あら、可愛い坊や。黒淵様の前に、私と遊んでいきなさい」',
     defeat: '紅蓮「ふふ……負けちゃった。久しぶりに、楽しかったわ」',
@@ -427,7 +430,7 @@ export const GENERALS: GenDef[] = [
   },
   {
     id: 'g_gaou', name: '鬼鎧 牙王', short: '牙王', reading: 'きがい がおう', faction: 'youma', role: '鬼大将', portrait: 'youma_gaou',
-    cmd: 70, pow: 95, int: 50, cha: 20, skills: ['onikudaki', 'dohatsu'], style: 'melee', youkai: true, lvBonus: 1,
+    cmd: 70, pow: 95, int: 50, cha: 20, skills: ['onikudaki', 'dohatsu'], style: 'melee', kind: 'bushi', youkai: true, lvBonus: 1,
     desc: '鬼哭原に陣取る鬼の大将。強い者と戦うことだけが生きがい。',
     intro: '牙王「グハハハ！ 強い匂いがする！ 来い、人の子！」',
     defeat: '牙王「グ……ハハ……！ 負けた……強い……！」',
@@ -449,7 +452,7 @@ export const GENERALS: GenDef[] = [
   // ── 浪人衆 ──
   {
     id: 'g_kagemaru', name: '漆黒 影丸', short: '影丸', reading: 'しっこく かげまる', faction: 'ronin', role: '浪人衆頭領・忍', portrait: 'ronin_kagemaru',
-    cmd: 78, pow: 85, int: 80, cha: 60, skills: ['ansatsu', 'kagebunshin'], style: 'melee', loyal: true,
+    cmd: 78, pow: 85, int: 80, cha: 60, skills: ['ansatsu', 'kagebunshin'], style: 'melee', kind: 'shinobi', loyal: true,
     desc: '浪人衆の頭領。忍の技を使う。素顔を見た者はいない。',
     intro: '影丸「……依頼人は誰か、とは聞くな」',
     defeat: '影丸「影が、光に負けたか」',
@@ -471,7 +474,7 @@ export const GENERALS: GenDef[] = [
   },
   {
     id: 'g_yuzuriha', name: '朔月 楪', short: '楪', reading: 'さくつき ゆずりは', faction: 'ronin', role: '二刀流剣士', portrait: 'ronin_yuzuriha',
-    cmd: 65, pow: 90, int: 60, cha: 80, skills: ['sougetsu', 'zanshin'], style: 'melee',
+    cmd: 65, pow: 90, int: 60, cha: 80, skills: ['sougetsu', 'zanshin'], style: 'melee', kind: 'bushi',
     desc: '二刀を操る流れの女剣士。強い剣士を探して旅をしている。',
     intro: '楪「あなたが噂の剣士？ ……一手、所望するわ」',
     defeat: '楪「見事……。私の二刀より、あなたの一刀が速い」',
@@ -493,18 +496,21 @@ export const GENERALS: GenDef[] = [
 
 // ── 名もなき侍大将（浪人宿で雇える・城の守り手） ──
 
-export interface GenericType { key: string; label: string; portrait: string; skill: string; style: FightStyle; cmd: [number, number]; pow: [number, number]; int: [number, number] }
+export interface GenericType { key: string; kind: Kind; label: string; portraits: string[]; cmd: [number, number]; pow: [number, number]; int: [number, number] }
 
+/** 名もなき侍大将（兵種ごと） */
 export const GENERIC_TYPES: GenericType[] = [
-  { key: 'attacker', label: '猛将', portrait: 'generic_attacker', skill: 'g_gouda', style: 'melee', cmd: [55, 70], pow: [72, 86], int: [30, 50] },
-  { key: 'defender', label: '守将', portrait: 'generic_defender', skill: 'g_teppeki', style: 'reach', cmd: [68, 82], pow: [55, 70], int: [40, 60] },
-  { key: 'sniper', label: '弓取り', portrait: 'generic_sniper', skill: 'g_sogeki', style: 'bow', cmd: [50, 65], pow: [65, 80], int: [45, 60] },
-  { key: 'strategist', label: '策士', portrait: 'generic_strategist', skill: 'g_sakubou', style: 'bow', cmd: [55, 70], pow: [35, 50], int: [75, 88] },
-  { key: 'commander', label: '侍大将', portrait: 'generic_commander', skill: 'g_kobu', style: 'melee', cmd: [72, 85], pow: [60, 75], int: [55, 70] },
-  { key: 'wild', label: '荒武者', portrait: 'generic_wild', skill: 'g_ranbu', style: 'melee', cmd: [40, 55], pow: [78, 90], int: [20, 40] },
-  { key: 'elite', label: '若武者', portrait: 'generic_gem', skill: 'g_gouda', style: 'reach', cmd: [60, 75], pow: [68, 82], int: [50, 65] },
-  { key: 'normal', label: '足軽頭', portrait: 'generic_normal', skill: 'g_teate', style: 'reach', cmd: [50, 65], pow: [50, 65], int: [45, 60] },
-  { key: 'oni', label: '鬼武者', portrait: 'youma_grunt', skill: 'g_onibi', style: 'melee', cmd: [55, 70], pow: [75, 88], int: [25, 45] },
+  { key: 'ashigaru', kind: 'ashigaru', label: '足軽大将', portraits: ['generic_normal', 'generic_defender'], cmd: [62, 80], pow: [50, 66], int: [45, 62] },
+  { key: 'bushi', kind: 'bushi', label: '侍大将', portraits: ['generic_attacker', 'generic_wild', 'generic_commander'], cmd: [55, 72], pow: [70, 88], int: [30, 55] },
+  { key: 'yumi', kind: 'yumi', label: '弓大将', portraits: ['generic_sniper'], cmd: [50, 66], pow: [62, 80], int: [45, 62] },
+  { key: 'teppo', kind: 'teppo', label: '鉄砲頭', portraits: ['generic_commander', 'generic_defender'], cmd: [55, 70], pow: [62, 78], int: [45, 60] },
+  { key: 'kiba', kind: 'kiba', label: '騎馬武者', portraits: ['generic_gem'], cmd: [60, 75], pow: [70, 86], int: [40, 58] },
+  { key: 'shinobi', kind: 'shinobi', label: '忍頭', portraits: ['generic_sniper', 'generic_wild'], cmd: [45, 60], pow: [60, 76], int: [60, 76] },
+  { key: 'gunshi', kind: 'gunshi', label: '軍師', portraits: ['generic_strategist'], cmd: [55, 70], pow: [35, 50], int: [75, 90] },
+  { key: 'miko', kind: 'miko', label: '巫女頭', portraits: ['generic_gem', 'generic_strategist'], cmd: [45, 60], pow: [30, 45], int: [65, 82] },
+  { key: 'sohei', kind: 'sohei', label: '僧兵頭', portraits: ['generic_defender', 'generic_normal'], cmd: [62, 78], pow: [62, 78], int: [45, 60] },
+  { key: 'onmyo', kind: 'onmyo', label: '陰陽師', portraits: ['generic_strategist'], cmd: [45, 60], pow: [35, 50], int: [75, 90] },
+  { key: 'youkai', kind: 'youkai', label: '鬼武者', portraits: ['youma_grunt'], cmd: [55, 70], pow: [75, 90], int: [25, 45] },
 ];
 
 export const SURNAMES = ['山田', '岡部', '村瀬', '井川', '土井', '長谷', '片岡', '波多', '立花', '杉村', '宮田', '堀', '樋口', '神保', '武藤', '富田', '石井', '矢野', '三宅', '安藤', '磯野', '岩瀬', '北山', '古沢', '湯浅', '佐久間', '津田', '前野', '柴山', '榎本', '結城', '相馬', '本郷', '新庄', '鵜飼', '滝沢', '白石'];

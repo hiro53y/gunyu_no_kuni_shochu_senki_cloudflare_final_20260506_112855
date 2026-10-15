@@ -1,23 +1,22 @@
 // 国盗りの状態（本陣）。保存の形もこれ
 import type { FactionId } from '../content/sengoku';
-import type { FightStyle, Line } from '../content/generals';
-import type { LordState } from '../engine/run';
-import type { Item, RunMode } from '../engine/types';
+import type { Line } from '../content/generals';
+import type { BattleKind, Kind } from '../battle/types';
 
-export const CAMPAIGN_VERSION = 1;
+export const CAMPAIGN_VERSION = 2;
 
 export interface RegionState {
   id: string;
   owner: FactionId;
-  /** 守りの兵 */
+  /** 籠城の守りの兵 */
   troops: number;
   /** 開発（年貢）1〜5 */
   dev: number;
-  /** 城の高さ（守り）1〜5 */
+  /** 城の高さ（籠城の守り）1〜5 */
   wall: number;
-  /** 破った城門（次はこの次の階から攻められる） */
-  breach: number;
-  /** 城主・中の階の将（武将ID） */
+  /** 落とした砦の数（すべて落とすと国が手に入る） */
+  taken: number;
+  /** 城主・2人目の将（武将ID） */
   boss?: string;
   mid?: string;
 }
@@ -30,8 +29,6 @@ export interface CustomGen {
   short: string;
   portrait: string;
   label: string;
-  skill: string;
-  style: FightStyle;
   cmd: number;
   pow: number;
   int: number;
@@ -47,8 +44,13 @@ export interface GenState {
   exp: number;
   /** 絆（交流の回数）0〜2 */
   bond: number;
-  /** 傷が治るまでのターン */
+  /** 傷が治るまでの季節 */
   injured: number;
+  /** 兵種と、今の兵数 */
+  kind: Kind;
+  troops: number;
+  /** 増員した回数 */
+  extra: number;
   custom?: CustomGen;
   /** 浪人宿で雇う値段 */
   wage?: number;
@@ -73,22 +75,31 @@ export interface Invasion {
 
 export interface News { turn: number; t: string; c?: 'good' | 'bad' | 'info' | 'warn' }
 
-/** 出陣中の記録（冒険が終わったら本陣に反映する） */
+/** 陣立て：誰をどこに置くか */
+export interface Placement { gen: string; row: 0 | 1; slot: 0 | 1 | 2 }
+
+/** 出陣中の記録（合戦が終わったら本陣に反映する） */
 export interface Sortie {
-  mode: RunMode;
+  mode: BattleKind;
   region: string;
-  party: string[];
+  party: Placement[];
   invasion?: Invasion;
+  /** 何番目の砦か（0から） */
+  fort?: number;
+  /** その場で作った敵の侍大将（捕らえた時に家臣にできるよう中身を残す） */
+  temps: Record<string, { custom: CustomGen; lv: number; kind: Kind; faction: FactionId }>;
 }
 
 export interface CampaignStats {
   battles: number;
   wins: number;
   losses: number;
+  /** 討った敵兵の数 */
   kills: number;
   captured: number;
   hunts: number;
   defenses: number;
+  /** いちばん大きな一撃 */
   maxHit: number;
 }
 
@@ -103,15 +114,7 @@ export interface Campaign {
   regions: Record<string, RegionState>;
   factions: Record<FactionId, { alive: boolean }>;
   gens: Record<string, GenState>;
-  lord: LordState;
-  /** 蔵（朔の装備を含む） */
-  store: Item[];
-  eq: { weapon?: number; armor?: number; charm?: number; arrow?: number };
-  nextUid: number;
   nextGen: number;
-  known: Record<string, true>;
-  fake: Record<string, string>;
-  named: Record<string, string>;
   news: News[];
   flags: Record<string, true>;
   /** これから見せるできごと */
@@ -121,8 +124,6 @@ export interface Campaign {
   /** 捕らえて、登用するか決める将 */
   captives: string[];
   sortie: Sortie | null;
-  /** 商人の品（ターンごとに入れ替わる） */
-  stock: string[];
   stats: CampaignStats;
   titles: Record<string, true>;
   /** 黒淵を討った（そのあとも続けられる） */
@@ -131,6 +132,6 @@ export interface Campaign {
   defeat?: number;
 }
 
-export interface Settings { bgm: number; se: number; fast: boolean; text: 's' | 'm' | 'l' }
+export interface Settings { bgm: number; se: number; fast: boolean; text: 's' | 'm' | 'l'; auto: boolean }
 
-export const DEFAULT_SETTINGS: Settings = { bgm: 0.5, se: 0.7, fast: false, text: 'm' };
+export const DEFAULT_SETTINGS: Settings = { bgm: 0.5, se: 0.7, fast: false, text: 'm', auto: false };

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { GEN_BY_ID } from '../content/generals';
 import type { Campaign, Scene } from '../campaign/state';
 import { genInfo } from '../campaign/campaign';
-import { bustUrl } from '../render/sprites';
+import { bustUrl } from './common';
 import { playSe } from '../audio/sound';
 
 export function SceneView({ c, scene, onDone }: { c: Campaign; scene: Scene; onDone: () => void }) {

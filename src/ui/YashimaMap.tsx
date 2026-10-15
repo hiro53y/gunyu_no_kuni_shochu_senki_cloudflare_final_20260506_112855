@@ -192,10 +192,10 @@ export function YashimaMap({ c, selected, onSelect }: MapProps) {
         g.strokeText(r.name, x, y + s * 0.5 + fs + 1);
         g.fillStyle = '#2a1a0e';
         g.fillText(r.name, x, y + s * 0.5 + fs + 1);
-        if (st.breach > 0 && st.owner !== 'akatsuki') {
+        if (st.taken > 0 && st.owner !== 'akatsuki') {
           g.font = `bold ${Math.round(fs * 0.8)}px sans-serif`;
           g.fillStyle = '#c8382a';
-          g.fillText(`門${st.breach}`, x + s * 1.1, y - s * 0.4);
+          g.fillText(`砦${st.taken}`, x + s * 1.2, y - s * 0.4);
         }
       }
       raf = requestAnimationFrame(draw);

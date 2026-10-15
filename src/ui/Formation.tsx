@@ -1,96 +1,153 @@
-// 出陣の編成：連れていく武将（2人まで）と持ち物（10個まで）
+// 陣立て：出す武将（朔を含め6部隊まで）を前衛・後衛の枠に置く。敵の顔ぶれも見える
 import { useMemo, useState } from 'react';
-import { itemDef } from '../content/items';
-import { skillDef } from '../content/skills';
 import { regionDef } from '../content/sengoku';
-import type { Campaign } from '../campaign/state';
-import { activeSkills, castleDanger, genInfo, MAX_CARRY, MAX_PARTY, ourGenerals, specOf } from '../campaign/campaign';
-import { genStats } from '../engine/generals';
-import type { RunMode } from '../engine/types';
-import { tokenUrl } from '../render/sprites';
-import { ItemIcon, Modal, itemLabel, storeLabel } from './common';
+import { LORD } from '../content/generals';
+import { KINDS, battleSkill } from '../battle/kinds';
+import type { UnitSpec } from '../battle/engine';
+import type { BattleKind } from '../battle/types';
+import type { Campaign, Invasion, Placement, Sortie } from '../campaign/state';
+import { MAX_PARTY, forts, genInfo, huntDanger, invasionDanger, maxTroops } from '../campaign/campaign';
+import { autoPlace, genPower, huntArmy, invasionArmy, siegeArmy, unitSkills } from '../campaign/army';
+import { KindMark, Modal, bustUrl, tokenUrl } from './common';
 import { playSe } from '../audio/sound';
 
-const MODE_TITLE: Record<RunMode, string> = { siege: '出陣', defense: '迎え撃つ', hunt: '修行（妖魔の巣）', practice: '道場' };
+const MODE_TITLE: Record<BattleKind, string> = { siege: '出陣', defense: '迎え撃つ', hunt: '妖魔討伐', field: '合戦' };
 
-/** 持っていくと良さそうな物を最初から選んでおく */
-function defaultCarry(c: Campaign): number[] {
-  const eq = new Set(Object.values(c.eq));
-  const score = (id: string) => {
-    const cat = itemDef(id).cat;
-    if (['g_yakusou', 'g_daiyakusou', 'g_fukkatsu'].includes(id)) return 10;
-    if (cat === 'food') return 8;
-    if (id === 's_kikan') return 7;
-    return 0;
-  };
-  return c.store.filter((i) => !eq.has(i.uid) && score(i.id) > 0).sort((a, b) => score(b.id) - score(a.id)).slice(0, MAX_CARRY).map((i) => i.uid);
+/** 出陣前に、敵の部隊を作ってみる（同じ seed なら本番も同じ） */
+export function previewEnemy(c: Campaign, mode: BattleKind, rid: string, seed: number, inv?: Invasion): UnitSpec[] {
+  const so: Sortie = { mode, region: rid, party: [], invasion: inv, fort: mode === 'siege' ? c.regions[rid].taken : undefined, temps: {} };
+  if (mode === 'siege') return siegeArmy(c, so, seed);
+  if (mode === 'defense' && inv) return invasionArmy(c, so, inv, seed, invasionDanger(c, inv.from));
+  return huntArmy(c, so, seed, huntDanger(c, rid));
 }
 
-export function Formation({ c, mode, region, onGo, onClose }: { c: Campaign; mode: RunMode; region: string; onGo: (party: string[], carry: number[]) => void; onClose?: () => void }) {
-  const gens = ourGenerals(c).sort((a, b) => (a.injured > 0 ? 1 : 0) - (b.injured > 0 ? 1 : 0) || b.lv - a.lv);
-  const [party, setParty] = useState<string[]>(() => gens.filter((g) => g.injured <= 0).slice(0, MAX_PARTY).map((g) => g.id));
-  const [carry, setCarry] = useState<number[]>(() => defaultCarry(c));
-  const [tab, setTab] = useState<'party' | 'items'>('party');
-  const eq = new Set(Object.values(c.eq));
-  const items = useMemo(() => c.store.filter((i) => !eq.has(i.uid)), [c.store, eq]);
+const key = (row: number, slot: number) => `${row}${slot}`;
+
+export function Formation({ c, mode, region, seed, inv, onGo, onClose }: { c: Campaign; mode: BattleKind; region: string; seed: number; inv?: Invasion; onGo: (party: Placement[]) => void; onClose?: () => void }) {
+  const ready = Object.values(c.gens).filter((g) => g.status === 'ours');
+  const usable = (id: string) => c.gens[id].injured <= 0 && c.gens[id].troops > 0;
+  const [slots, setSlots] = useState<Record<string, string>>(() => {
+    const score = (id: string) => { const p = genPower(c, id); return (p.atk + p.def + p.int) * Math.sqrt(c.gens[id].troops); };
+    const list = ready.filter((g) => g.id !== LORD && usable(g.id)).sort((a, b) => score(b.id) - score(a.id)).slice(0, MAX_PARTY - 1);
+    const out: Record<string, string> = {};
+    for (const p of autoPlace([c.gens[LORD], ...list].filter((g) => usable(g.id)).map((g) => ({ id: g.id, kind: g.kind })))) out[key(p.row, p.slot)] = p.gen;
+    return out;
+  });
+  const [sel, setSel] = useState<string | null>(null);
+  const [tab, setTab] = useState<'army' | 'enemy'>('army');
+  const enemy = useMemo(() => previewEnemy(c, mode, region, seed, inv), [c, mode, region, seed, inv]);
+  const placedIds = new Set(Object.values(slots));
   const r = regionDef(region);
-  const toggleGen = (id: string) => {
+  const lordPlaced = placedIds.has(LORD);
+
+  const assign = (id: string) => {
     playSe('menu');
-    setParty((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length >= MAX_PARTY ? [...p.slice(1), id] : [...p, id]));
+    const next = { ...slots };
+    const cur = Object.keys(next).find((k) => next[k] === id);
+    if (sel) {
+      const prev = next[sel];
+      if (cur) { if (prev) next[cur] = prev; else delete next[cur]; }
+      next[sel] = id;
+      setSel(null);
+    } else if (cur) {
+      if (id === LORD) return;
+      delete next[cur];
+    } else {
+      const empty = ['00', '01', '02', '10', '11', '12'].filter((k) => !next[k]);
+      const want = KINDS[c.gens[id].kind].front ? empty.find((k) => k[0] === '0') ?? empty[0] : empty.find((k) => k[0] === '1') ?? empty[0];
+      if (!want) return;
+      next[want] = id;
+    }
+    setSlots(next);
   };
-  const toggleItem = (uid: number) => {
+  const tapSlot = (k: string) => {
     playSe('menu');
-    setCarry((list) => (list.includes(uid) ? list.filter((x) => x !== uid) : list.length >= MAX_CARRY ? list : [...list, uid]));
+    if (sel === k) { setSel(null); return; }
+    if (sel && (slots[sel] || slots[k])) {
+      const next = { ...slots };
+      const a = next[sel], b = next[k];
+      if (a) next[k] = a; else delete next[k];
+      if (b) next[sel] = b; else delete next[sel];
+      setSlots(next);
+      setSel(null);
+      return;
+    }
+    setSel(k);
   };
-  const danger = mode === 'siege' ? castleDanger(c, region) : null;
+  const go = () => {
+    const party: Placement[] = Object.entries(slots).map(([k, gen]) => ({ gen, row: Number(k[0]) as 0 | 1, slot: Number(k[1]) as 0 | 1 | 2 }));
+    playSe('menu');
+    onGo(party);
+  };
+  const cell = (k: string) => {
+    const id = slots[k];
+    const g = id ? c.gens[id] : null;
+    const info = id ? genInfo(c, id) : null;
+    return (
+      <button key={k} className={`form-slot ${sel === k ? 'sel' : ''} ${id ? '' : 'empty'}`} onClick={() => tapSlot(k)}>
+        {info && g ? (
+          <>
+            <img src={tokenUrl(info.portrait)} alt="" />
+            <span className="fs-name">{info.short}</span>
+            <span className="fs-kind"><KindMark kind={g.kind} size={14} />{g.troops}</span>
+          </>
+        ) : <span className="fs-empty">{k[0] === '0' ? '前衛' : '後衛'}</span>}
+      </button>
+    );
+  };
+  const title = mode === 'siege' ? `${MODE_TITLE[mode]}：${r.name}（砦 ${c.regions[region].taken + 1}/${forts(region)}）` : `${MODE_TITLE[mode]}：${r.name}`;
   return (
-    <Modal title={`${MODE_TITLE[mode]}：${r.name}`} onClose={onClose} className="inventory formation">
-      {mode === 'siege' && <p className="note">{r.floors}階の城（強さ{danger}・朔 Lv{c.lord.lv}）。{c.regions[region].breach > 0 ? `城門は${c.regions[region].breach}階まで破ってある。` : ''}</p>}
-      {mode === 'defense' && <p className="note">野戦で敵の大将を討てば勝ち。負けるとこの国を失う。</p>}
-      {mode === 'hunt' && <p className="note">3階の妖魔の巣。奥まで祓えば、経験と文が手に入る。</p>}
+    <Modal title={title} onClose={onClose} className="inventory formation">
       <div className="tabs seg">
-        <button className={tab === 'party' ? 'on' : ''} onClick={() => setTab('party')}>武将 {party.length}/{MAX_PARTY}</button>
-        <button className={tab === 'items' ? 'on' : ''} onClick={() => setTab('items')}>持ち物 {carry.length}/{MAX_CARRY}</button>
+        <button className={tab === 'army' ? 'on' : ''} onClick={() => setTab('army')}>陣立て {placedIds.size}/{MAX_PARTY}</button>
+        <button className={tab === 'enemy' ? 'on' : ''} onClick={() => setTab('enemy')}>敵の部隊 {enemy.length}</button>
       </div>
-      {tab === 'party' && (
-        <div className="gen-pick">
-          {gens.length === 0 && <p className="empty">まだ家臣がいない。</p>}
-          {gens.map((g) => {
-            const info = genInfo(c, g.id);
-            const st = genStats(specOf(c, g.id, true));
-            const on = party.includes(g.id);
-            return (
-              <button key={g.id} className={`gen-card ${on ? 'on' : ''}`} disabled={g.injured > 0} onClick={() => toggleGen(g.id)}>
-                <img src={tokenUrl(info.portrait)} alt="" width={42} height={42} />
-                <span className="gc-main">
-                  <b>{info.name}</b> <small>Lv{g.lv}・{info.role}</small>
-                  <small>HP{st.maxHp} 攻{Math.round(st.atk)}・技 {activeSkills(c, g.id).map((s) => skillDef(s).name).join('・')}</small>
-                  {g.injured > 0 && <small className="bad">傷を癒やしている（あと{g.injured}ターン）</small>}
-                </span>
-                {on && <span className="check">出陣</span>}
-              </button>
-            );
-          })}
-        </div>
-      )}
-      {tab === 'items' && (
+      {tab === 'army' && (
         <>
-          <p className="note">装備（{['weapon', 'armor', 'charm', 'arrow'].map((s) => { const it = c.store.find((i) => i.uid === c.eq[s as 'weapon']); return it ? itemLabel(null, it) : null; }).filter(Boolean).join('・') || 'なし'}）は必ず持っていく。負けると装備以外は失う。</p>
-          <div className="inv-list">
-            {items.length === 0 && <p className="empty">蔵は空っぽ。</p>}
-            {items.map((item) => (
-              <button key={item.uid} className={`inv-row ${carry.includes(item.uid) ? 'equipped' : ''}`} onClick={() => toggleItem(item.uid)}>
-                <ItemIcon id={item.id} size={28} />
-                <span className="inv-name">{storeLabel(c, item)}</span>
-                {carry.includes(item.uid) && <small className="inv-extra">持つ</small>}
-              </button>
-            ))}
+          <div className="form-grid">
+            <div className="fg-col"><small>後衛</small>{[0, 1, 2].map((s) => cell(key(1, s)))}</div>
+            <div className="fg-col"><small>前衛</small>{[0, 1, 2].map((s) => cell(key(0, s)))}</div>
+            <div className="fg-arrow">▶<small>敵</small></div>
+          </div>
+          <p className="note">{sel ? '置く武将を下から選ぶか、入れ替える枠を押してください。' : '枠を押して選び、武将を置く・入れ替える。前衛は近距離の技が使え、狙われやすい。足軽は同じ列の味方をかばう。'}</p>
+          <div className="gen-pick">
+            {ready.sort((a, b) => (a.id === LORD ? -1 : b.id === LORD ? 1 : b.lv - a.lv)).map((g) => {
+              const info = genInfo(c, g.id);
+              const ok = usable(g.id);
+              const on = placedIds.has(g.id);
+              return (
+                <button key={g.id} className={`gen-card ${on ? 'on' : ''}`} disabled={!ok} onClick={() => assign(g.id)}>
+                  <img src={tokenUrl(info.portrait)} alt="" width={40} height={40} />
+                  <span className="gc-main">
+                    <b>{info.name}</b> <small><KindMark kind={g.kind} size={14} /> {KINDS[g.kind].name}・Lv{g.lv}・兵{g.troops}/{maxTroops(c, g.id)}</small>
+                    <small>技 {unitSkills(c, g.id, true).map((s) => battleSkill(s).name).join('・')}</small>
+                    {!ok && <small className="bad">{g.injured > 0 ? `傷を癒やしている（あと${g.injured}季節）` : '兵がいない（城下で補充）'}</small>}
+                  </span>
+                  {on && <span className="check">{g.id === LORD ? '大将' : '出陣'}</span>}
+                </button>
+              );
+            })}
           </div>
         </>
       )}
+      {tab === 'enemy' && (
+        <div className="gen-pick">
+          {enemy.map((u) => (
+            <div key={u.gen} className="gen-card static">
+              <img src={tokenUrl(u.portrait)} alt="" width={40} height={40} className={u.boss ? 'boss' : ''} />
+              <span className="gc-main">
+                <b>{u.name}</b>{u.boss && <small className="bad"> 大将</small>} <small><KindMark kind={u.kind} size={14} /> {KINDS[u.kind].name}・Lv{u.lv}・兵{u.troops}・{u.row === 0 ? '前衛' : '後衛'}</small>
+                <small>技 {u.skills.map((s) => battleSkill(s).name).join('・')}</small>
+              </span>
+            </div>
+          ))}
+          {mode === 'siege' && <p className="note">{c.regions[region].taken + 1 >= forts(region) ? '本城の合戦。勝てば国が手に入る。' : `勝つと砦を1つ落とす。すべて落とすと国が手に入る。`}</p>}
+          <img className="enemy-bust" src={bustUrl(enemy.find((u) => u.boss)?.portrait ?? enemy[0]?.portrait ?? 'generic_normal')} alt="" />
+        </div>
+      )}
       <div className="row-buttons">
         {onClose && <button onClick={onClose}>やめる</button>}
-        <button className="primary" onClick={() => { playSe('menu'); onGo(party, carry); }}>{mode === 'defense' ? '迎え撃つ！' : '出陣！'}</button>
+        <button className="primary" disabled={!lordPlaced} onClick={go}>{mode === 'defense' ? '迎え撃つ！' : '出陣！'}{!lordPlaced && <small>朔を置いてください</small>}</button>
       </div>
     </Modal>
   );

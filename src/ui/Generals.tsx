@@ -1,14 +1,12 @@
-// 武将の一覧と詳しい情報（技・絆・交流）
+// 武将の一覧と詳しい情報（兵種・兵数・能力・技・絆・交流）
 import { useState } from 'react';
-import { skillDef } from '../content/skills';
 import { FACTIONS } from '../content/sengoku';
 import { GENERALS, GEN_BY_ID, LORD } from '../content/generals';
+import { KINDS, RANGE_NAME, battleSkill } from '../battle/kinds';
 import type { Campaign, GenState, Scene } from '../campaign/state';
-import { activeSkills, bondError, doBond, genInfo, specOf } from '../campaign/campaign';
-import { genStats } from '../engine/generals';
-import { expFor } from '../engine/core';
-import { bustUrl, tokenUrl } from '../render/sprites';
-import { Modal } from './common';
+import { bondError, doBond, expFor, genInfo, maxTroops } from '../campaign/campaign';
+import { genPower, unitSkills } from '../campaign/army';
+import { KindMark, Modal, bustUrl, tokenUrl } from './common';
 import { playSe } from '../audio/sound';
 
 const STATUS: Record<GenState['status'], string> = { ours: '家臣', enemy: '敵', jail: '牢', ronin: '浪人', gone: '' };
@@ -33,14 +31,15 @@ export function GeneralsPanel({ c, onChange, onScene, onClose }: { c: Campaign; 
             {ours.map((id) => {
               const info = genInfo(c, id);
               const g = c.gens[id];
-              const lv = id === LORD ? c.lord.lv : g.lv;
+              const max = maxTroops(c, id);
               return (
                 <button key={id} className="gen-card" onClick={() => { playSe('menu'); setSel(id); }}>
                   <img src={tokenUrl(info.portrait)} alt="" width={42} height={42} />
                   <span className="gc-main">
-                    <b>{info.name}</b> <small>Lv{lv}・{info.role}</small>
-                    <small>技 {activeSkills(c, id).map((s) => skillDef(s).name).join('・')}{id !== LORD && info.unique ? `・絆${'♥'.repeat(g.bond)}${'♡'.repeat(Math.max(0, 2 - g.bond))}` : ''}</small>
-                    {g?.injured > 0 && <small className="bad">傷を癒やしている（あと{g.injured}ターン）</small>}
+                    <b>{info.name}</b> <small><KindMark kind={g.kind} size={14} /> {KINDS[g.kind].name}・Lv{g.lv}・{info.role}</small>
+                    <span className="troop-bar"><span style={{ width: `${(g.troops / max) * 100}%` }} /></span>
+                    <small>兵 {g.troops}/{max}{id !== LORD && info.unique ? `・絆${'♥'.repeat(g.bond)}${'♡'.repeat(Math.max(0, 2 - g.bond))}` : ''}</small>
+                    {g.injured > 0 && <small className="bad">傷を癒やしている（あと{g.injured}季節）</small>}
                   </span>
                 </button>
               );
@@ -56,7 +55,7 @@ export function GeneralsPanel({ c, onChange, onScene, onClose }: { c: Campaign; 
                   return (
                     <div key={g.id} className="gen-card static">
                       <img src={tokenUrl(info.portrait)} alt="" width={42} height={42} />
-                      <span className="gc-main"><b>{info.name}</b><small>{FACTIONS[g.faction].name}・Lv{g.lv}</small></span>
+                      <span className="gc-main"><b>{info.name}</b><small>{FACTIONS[g.faction].name}・{KINDS[g.kind].name}・Lv{g.lv}</small></span>
                     </div>
                   );
                 })}
@@ -88,37 +87,45 @@ function GeneralDetail({ c, id, onBack, onBond }: { c: Campaign; id: string; onB
   const info = genInfo(c, id);
   const g = c.gens[id];
   const isLord = id === LORD;
-  const lv = isLord ? c.lord.lv : g.lv;
-  const st = isLord ? null : genStats(specOf(c, id, true));
-  const active = activeSkills(c, id);
+  const pw = genPower(c, id);
+  const skills = unitSkills(c, id, true);
   const err = isLord ? '当主' : bondError(c, id);
   const def = GEN_BY_ID[id];
+  const locked = info.skills.filter((s) => !skills.includes(s));
   return (
     <Modal title={info.name} onClose={onBack} className="inventory gen-detail">
       <div className="gd-top">
         <img className="gd-bust" src={bustUrl(info.portrait)} alt="" />
         <div className="gd-stats">
           <p className="gd-role">{info.role}</p>
-          <p>Lv <b>{lv}</b>{isLord ? `（次まで ${Math.max(0, expFor(lv + 1) - c.lord.exp)}）` : `（次まで ${Math.max(0, expFor(lv + 1) - g.exp)}）`}</p>
-          {isLord ? <p>HP {c.lord.maxHp}・力 {c.lord.maxStr}</p> : <p>HP {st!.maxHp}・攻 {Math.round(st!.atk)}・防 {Math.round(st!.def)}</p>}
+          <p><KindMark kind={g.kind} /> {KINDS[g.kind].name}・Lv <b>{g.lv}</b>（次まで {Math.max(0, expFor(g.lv + 1) - g.exp)}）</p>
+          <p>兵 {g.troops}/{maxTroops(c, id)}・技数 {KINDS[g.kind].ap + Math.floor(g.lv / 10)}</p>
+          <p className="stats">攻{pw.atk} 防{pw.def} 知{pw.int} 速{pw.spd}</p>
           <p className="stats">統{info.cmd} 武{info.pow} 知{info.int}</p>
-          <p className="stats">{info.style === 'reach' ? '槍：2マス先まで届く' : info.style === 'bow' ? '弓：離れた敵を射る' : info.style === 'gun' ? '鉄砲：離れた敵を撃つ' : '刀：隣の敵を斬る'}</p>
           {!isLord && info.unique && <p>絆 {'♥'.repeat(g.bond)}{'♡'.repeat(Math.max(0, (def?.bond.length ?? 2) - g.bond))}</p>}
         </div>
       </div>
       <p className="desc">{info.desc}</p>
-      <h4>技</h4>
-      {info.skills.map((sid, i) => {
-        const s = skillDef(sid);
-        const on = active.includes(sid);
+      <p className="note">{KINDS[g.kind].desc}</p>
+      <h4>合戦の技</h4>
+      {skills.map((sid) => {
+        const s = battleSkill(sid);
         return (
-          <div key={sid} className={`skill-row ${on ? '' : 'locked'}`}>
-            <b style={{ color: on ? s.color : undefined }}>{s.name}</b>
-            <small>{on ? s.desc : isLord ? '国を5つ取ると目覚める。' : i === 1 && info.unique ? '絆が深まると覚える。' : ''}</small>
-            {on && <small className="sub">待ち {s.cd}ターン</small>}
+          <div key={sid} className="skill-row">
+            <b style={{ color: s.color }}>{s.name}</b>
+            <small>{RANGE_NAME[s.range]}・消費{s.cost === 'all' ? '全' : s.cost}・硬直{s.stiff}{s.prep ? '・要準備' : ''}　{s.desc}</small>
           </div>
         );
       })}
+      {locked.map((sid) => (
+        <div key={sid} className="skill-row locked">
+          <b>{battleSkill(sid).name}</b>
+          <small>{isLord ? '国を5つ取ると使える。' : '絆が深まると使える。'}</small>
+        </div>
+      ))}
+      {KINDS[g.kind].skills.filter(([sid, lv]) => lv > g.lv && !skills.includes(sid)).map(([sid, lv]) => (
+        <div key={sid} className="skill-row locked"><b>{battleSkill(sid).name}</b><small>Lv{lv}で覚える。</small></div>
+      ))}
       {!isLord && (
         <div className="row-buttons">
           <button onClick={onBack}>戻る</button>

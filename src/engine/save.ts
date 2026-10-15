@@ -1,15 +1,14 @@
-// 保存：本陣（国盗り）・出陣中の冒険（毎ターン）・ターンの始めの写し・設定。壊れたデータは読み込まない
-import { ITEM_BY_ID } from '../content/items';
-import { MON_BY_ID } from '../content/monsters';
+// 保存：本陣（国盗り）・合戦の途中（毎手）・季節の始めの写し・設定。壊れたデータは読み込まない
 import { REGIONS } from '../content/sengoku';
+import { KINDS } from '../battle/kinds';
+import { BATTLE_VERSION } from '../battle/engine';
+import type { Battle } from '../battle/types';
 import { CAMPAIGN_VERSION, DEFAULT_SETTINGS, type Campaign, type Settings } from '../campaign/state';
-import { RUN_VERSION } from './run';
-import type { Item, Run } from './types';
 
-export const KEY_RUN = 'gunyu3:run';
-export const KEY_CAMPAIGN = 'gunyu3:campaign';
-export const KEY_SNAPSHOT = 'gunyu3:turnstart';
-export const KEY_SETTINGS = 'gunyu3:settings';
+export const KEY_BATTLE = 'gunyu4:battle';
+export const KEY_CAMPAIGN = 'gunyu4:campaign';
+export const KEY_SNAPSHOT = 'gunyu4:turnstart';
+export const KEY_SETTINGS = 'gunyu4:settings';
 
 export interface KV {
   getItem(key: string): string | null;
@@ -25,34 +24,21 @@ function store(): KV | null {
   }
 }
 
-function validItems(items: unknown): boolean {
-  if (!Array.isArray(items)) return false;
-  return items.every((i) => {
-    const item = i as Item;
-    return item && typeof item.uid === 'number' && typeof item.id === 'string' && !!ITEM_BY_ID[item.id] && (!item.contents || validItems(item.contents));
-  });
+const num = (n: unknown) => typeof n === 'number' && Number.isFinite(n);
+
+/** 読み込んだ合戦が、今の版で続けられる形か */
+export function validBattle(value: unknown): value is Battle {
+  const b = value as Battle;
+  if (!b || b.v !== BATTLE_VERSION || !Array.isArray(b.units) || !b.units.length) return false;
+  if (![b.time, b.limit, b.rng, b.gaugeAdj].every(num)) return false;
+  return b.units.every((u) => !!KINDS[u.kind] && [u.troops, u.maxTroops, u.ap, u.next].every(num) && Array.isArray(u.skills));
 }
 
-/** 読み込んだ冒険が、今の版で遊べる形か */
-export function validRun(value: unknown): value is Run {
-  const run = value as Run;
-  if (!run || run.v !== RUN_VERSION) return false;
-  if (!run.player || !run.floor || !Array.isArray(run.monsters) || !Array.isArray(run.log) || !run.gens || !Array.isArray(run.party)) return false;
-  const f = run.floor;
-  if (!Array.isArray(f.tiles) || f.tiles.length !== f.w * f.h || !Array.isArray(f.seen) || f.seen.length !== f.tiles.length) return false;
-  if (!validItems(run.player.inv) || !validItems(f.items.map((fi) => fi.item))) return false;
-  if (!run.monsters.every((m) => !!MON_BY_ID[m.id] && (!m.gen || !!run.gens[m.gen]))) return false;
-  for (const n of [run.player.hp, run.player.maxHp, run.player.lv, run.player.hunger, run.rng, run.turn, run.floorNo]) {
-    if (typeof n !== 'number' || !Number.isFinite(n)) return false;
-  }
-  return true;
-}
-
-export function deserializeRun(text: string | null): Run | null {
+export function deserializeBattle(text: string | null): Battle | null {
   if (!text) return null;
   try {
-    const run = JSON.parse(text) as Run;
-    return validRun(run) ? run : null;
+    const b = JSON.parse(text) as Battle;
+    return validBattle(b) ? b : null;
   } catch {
     return null;
   }
@@ -61,10 +47,9 @@ export function deserializeRun(text: string | null): Run | null {
 export function validCampaign(value: unknown): value is Campaign {
   const c = value as Campaign;
   if (!c || c.v !== CAMPAIGN_VERSION) return false;
-  if (!c.regions || REGIONS.some((r) => !c.regions[r.id]) || !c.gens || !c.lord || !c.factions) return false;
-  if (!validItems(c.store)) return false;
-  for (const n of [c.turn, c.ap, c.gold, c.rng, c.lord.lv, c.lord.maxHp]) if (typeof n !== 'number' || !Number.isFinite(n)) return false;
-  return true;
+  if (!c.regions || REGIONS.some((r) => !c.regions[r.id]) || !c.gens || !c.factions || !c.gens.g_saku) return false;
+  for (const n of [c.turn, c.ap, c.gold, c.rng]) if (!num(n)) return false;
+  return Object.values(c.gens).every((g) => !!KINDS[g.kind] && num(g.troops) && num(g.lv));
 }
 
 export function deserializeCampaign(text: string | null): Campaign | null {
@@ -104,12 +89,12 @@ function get(kv: KV | null, key: string): string | null {
   }
 }
 
-export function saveRun(run: Run | null, kv: KV | null = store()) {
-  put(kv, KEY_RUN, run ? JSON.stringify(run) : null);
+export function saveBattle(b: Battle | null, kv: KV | null = store()) {
+  put(kv, KEY_BATTLE, b ? JSON.stringify(b) : null);
 }
 
-export function loadRun(kv: KV | null = store()): Run | null {
-  return deserializeRun(get(kv, KEY_RUN));
+export function loadBattle(kv: KV | null = store()): Battle | null {
+  return deserializeBattle(get(kv, KEY_BATTLE));
 }
 
 export function saveCampaign(c: Campaign | null, kv: KV | null = store()) {
@@ -120,7 +105,7 @@ export function loadCampaign(kv: KV | null = store()): Campaign | null {
   return deserializeCampaign(get(kv, KEY_CAMPAIGN));
 }
 
-/** ターンの始めの写し（負けた時にやり直す） */
+/** 季節の始めの写し（落城した時にやり直す） */
 export function saveSnapshot(c: Campaign | null, kv: KV | null = store()) {
   put(kv, KEY_SNAPSHOT, c ? JSON.stringify(c) : null);
 }

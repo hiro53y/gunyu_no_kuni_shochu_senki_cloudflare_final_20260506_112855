@@ -1,4 +1,5 @@
-// 八洲の国（15）と勢力（8）。国盗りの地図と、城の迷宮の作りを決める
+// 八洲の国（15）と勢力（8）。国盗りの地図と、守りの部隊・砦の数を決める
+import type { Kind } from '../battle/types';
 export type FactionId = 'akatsuki' | 'kurogane' | 'shion' | 'shirasagi' | 'honoo' | 'rengein' | 'youma' | 'ronin';
 
 export type Terrain =
@@ -14,9 +15,9 @@ export interface FactionDef {
   mon: string;
   /** 攻めてくる気の強さ（0〜1） */
   aggression: number;
-  /** 城の兵の顔ぶれ（敵の系統と重み） */
-  troops: [string, number][];
-  /** 妖怪が混ざる割合 */
+  /** 守りの部隊の兵種と重み */
+  troops: [Kind, number][];
+  /** 妖怪の割合（妖魔の群は1） */
   youkai: number;
   desc: string;
 }
@@ -24,42 +25,42 @@ export interface FactionDef {
 export const FACTIONS: Record<FactionId, FactionDef> = {
   akatsuki: {
     id: 'akatsuki', name: '暁ノ家', color: '#c84a4a', light: '#e8a090', mon: '暁', aggression: 0,
-    troops: [['ashigaru', 3], ['yumi', 2]], youkai: 0.2,
+    troops: [['ashigaru', 3], ['yumi', 2], ['bushi', 2]], youkai: 0,
     desc: '中央の平野「暁原」を治める小さな家。若き当主・風間朔が家督を継いだばかり。',
   },
   kurogane: {
     id: 'kurogane', name: '黒鉄家', color: '#5a5e6a', light: '#a8adb8', mon: '鉄', aggression: 0.42,
-    troops: [['ashigaru', 3], ['teppo', 3], ['musha', 2]], youkai: 0.25,
+    troops: [['ashigaru', 3], ['teppo', 2], ['bushi', 2], ['yumi', 1]], youkai: 0,
     desc: '鉱山と鉄砲で東を治める武の家。当主・黒鉄玄武は隙あらば暁原を呑もうと狙っている。',
   },
   shion: {
     id: 'shion', name: '紫苑家', color: '#7e5ba3', light: '#c4aee0', mon: '紫', aggression: 0.3,
-    troops: [['kaizoku', 3], ['yumi', 2], ['ashigaru', 2]], youkai: 0.25,
+    troops: [['bushi', 2], ['yumi', 3], ['ashigaru', 2], ['gunshi', 1], ['shinobi', 1]], youkai: 0,
     desc: '南の湊を押さえる商いの家。若き女当主・紫苑院葉月は金で戦を動かす。',
   },
   shirasagi: {
     id: 'shirasagi', name: '白鷺家', color: '#9ea6b8', light: '#dde2ec', mon: '鷺', aggression: 0.22,
-    troops: [['kiba', 3], ['yumi', 3], ['musha', 1]], youkai: 0.3,
+    troops: [['kiba', 3], ['yumi', 3], ['bushi', 1], ['ashigaru', 1]], youkai: 0,
     desc: '北西の山と雪原の古い武家。騎馬と弓に優れ、守りは固い。',
   },
   honoo: {
     id: 'honoo', name: '焔ノ家', color: '#d43818', light: '#f0a080', mon: '焔', aggression: 0.28,
-    troops: [['hiya', 3], ['sohei', 1], ['ashigaru', 2]], youkai: 0.35,
+    troops: [['onmyo', 2], ['teppo', 2], ['ashigaru', 2], ['miko', 1]], youkai: 0,
     desc: '北の火山で神を祀る巫女の家。火の術を操る。',
   },
   rengein: {
     id: 'rengein', name: '蓮華院', color: '#3f8060', light: '#a0d0b4', mon: '蓮', aggression: 0.12,
-    troops: [['sohei', 3], ['jutsu', 2], ['ashigaru', 1]], youkai: 0.15,
+    troops: [['sohei', 3], ['miko', 2], ['onmyo', 1], ['ashigaru', 1]], youkai: 0,
     desc: '森と山寺の武装寺院。妖魔の調伏を何より重んじる。',
   },
   youma: {
     id: 'youma', name: '妖魔の群', color: '#2a1a2e', light: '#8a6a9a', mon: '妖', aggression: 0.0,
-    troops: [], youkai: 1,
+    troops: [['youkai', 1]], youkai: 1,
     desc: '黄泉沼から湧き出した異形の群れ。首領・蛟王黒淵のもと、八洲を呑み込もうとしている。',
   },
   ronin: {
     id: 'ronin', name: '浪人衆', color: '#1f3a6e', light: '#90a8d8', mon: '浪', aggression: 0,
-    troops: [['shinobi', 3], ['ashigaru', 2], ['kaizoku', 1]], youkai: 0.2,
+    troops: [['shinobi', 3], ['bushi', 2], ['ashigaru', 1]], youkai: 0,
     desc: '南西の群島「浪間」を根城にする流れ者の集まり。金で動く。',
   },
 };
@@ -75,7 +76,7 @@ export interface RegionDef {
   owner: FactionId;
   /** 城の強さ（敵の強さの基準になる階） */
   danger: number;
-  /** 城の階数 */
+  /** （旧）城の階数。砦の数の目安に使う */
   floors: number;
   /** 本拠（落とすと勢力が大きく傾く） */
   capital?: boolean;

@@ -4,7 +4,7 @@
 // - その他 GET リクエストは cache-first（バンドルアセット等）
 // - 失敗レスポンス（4xx/5xx）はキャッシュしない
 
-const CACHE_NAME = 'gunyu-no-kuni-v6-roguelike';
+const CACHE_NAME = 'gunyu-no-kuni-v7-kassen';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg'];
 
 self.addEventListener('install', (event) => {

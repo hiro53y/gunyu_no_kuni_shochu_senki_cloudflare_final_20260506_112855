@@ -1,6 +1,7 @@
-// 難易度の集計（BALANCE=回数 の時だけ動く）：国盗りを最初から最後まで自動で遊ばせ、勝つまでのターン・負け・城攻めの勝率を見る
+// 難易度の集計（BALANCE=回数 の時だけ動く）：国盗りを最初から最後まで自動で遊ばせ、勝つまでの季節・負け・合戦の勝率を見る
 import { describe, it } from 'vitest';
 import { newCampaign, ownedCount } from '../src/campaign/campaign';
+import { LORD } from '../src/content/generals';
 import { playCampaign } from './campaignBot';
 
 const N = Number(process.env.BALANCE ?? 0);
@@ -11,12 +12,13 @@ describe.runIf(N > 0)('難易度の集計', () => {
       const seed = 900 + i * 53;
       const res = playCampaign(newCampaign(seed), seed, Number(process.env.MAX_TURNS ?? 100));
       const c = res.c;
-      const sieges = res.battles.filter((b) => b.mode === 'siege');
-      const defenses = res.battles.filter((b) => b.mode === 'defense');
+      const of = (m: string) => res.battles.filter((b) => b.mode === m);
+      const rate = (m: string) => `${of(m).filter((b) => b.kind === 'win').length}/${of(m).length}`;
+      const reasons: Record<string, number> = {};
+      for (const b of res.battles) reasons[b.reason ?? '?'] = (reasons[b.reason ?? '?'] ?? 0) + 1;
       console.log(JSON.stringify({
-        seed, errors: res.errors.slice(0, 2), victory: c.victory ?? null, defeat: c.defeat ?? null, turn: c.turn, regions: ownedCount(c), lv: c.lord.lv,
-        sieges: `${sieges.filter((b) => b.kind === 'win').length}/${sieges.length}`, defenses: `${defenses.filter((b) => b.kind === 'win').length}/${defenses.length}`,
-        hunts: res.battles.filter((b) => b.mode === 'hunt').length,
+        seed, errors: res.errors.slice(0, 2), victory: c.victory ?? null, defeat: c.defeat ?? null, turn: c.turn, regions: ownedCount(c), lv: c.gens[LORD].lv,
+        siege: rate('siege'), defense: rate('defense'), hunt: rate('hunt'), reasons,
       }));
     });
   }
