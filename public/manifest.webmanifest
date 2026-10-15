@@ -1,7 +1,7 @@
 {
   "name": "群雄ノ國：掌中戦記",
   "short_name": "掌中戦記",
-  "description": "スマホ向け和風国取りターン制シミュレーションゲーム",
+  "description": "八洲十五国の城を、不思議のダンジョンのように一手ずつ攻め落とす国盗りローグライク",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0b1220",

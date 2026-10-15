@@ -1,5 +1,20 @@
 # 引き継ぎノート
 
+## 3.0（2026-10-15、Claude）：国盗り×不思議のダンジョンに作り直し
+
+- ユーザー依頼：「群雄ノ國：掌中戦記を徹底改修し、戦国ランスのような超面白い不思議なダンジョン系アプリに作り直して」。確認した選択：国盗り＋城が迷宮／立ち絵の顔入りの丸い駒／じっくり（数時間〜）。URL・名前・manifest の start_url は据え置き（APP HUB seed-4・WebAPK のため）。
+- 旧ソース（2.x の国取りSLG）は `archive/v2.1/` へ `git mv`（ビルド対象外）。迷宮の仕組みは app_009「不思議なダンジョンもどき 2.1」の engine を土台に写して作り替えた。
+- 本陣：`src/campaign/campaign.ts`。1季節に行動3。出陣（隣の国）・修行（3階）・内政・交流。ターンの終わりに年貢・傷の回復・城門の戻り・敵の手番（侵攻、8季節目から妖魔の群が人の国も呑む）。暁原を失うと落城（季節の始めの写しからやり直し）。黒淵を討つと結末、全国で天下統一。
+- 迷宮：`src/engine/run.ts`（BattleSpec から冒険を作る。siege/defense/hunt/practice）。中の階（ceil(階数/2)）に2人目の将、倒さずに上ると天守で城主と一緒に出る。城主・大将を討つと勝ち（残りの兵は逃げ散る）。撤退の巻物で退くと、登った階まで城門が破れたまま。
+- 武将：`src/engine/generals.ts`（genStats：HP15+Lv×3.6+統率×0.1、攻撃1+Lv×0.7+武力×0.03、城主はHP×3）。技は `src/engine/skills.ts`（味方も敵の将も同じ処理、`canUseSkill` は理由も返す）。味方の武将は倒れると fallen（本陣で2ターンの傷）。
+- 経験値：国盗りではレベルが残るので `EXP_RATE=0.22`（Run.expRate）。
+- 絵：駒は `scripts/make-tokens.py` で立ち絵から作った `public/assets/tokens/*.webp`、会話は `public/assets/busts/*.webp`。兵は `src/render/soldiers.ts` が Canvas で描いて勢力の色で塗る。床と壁は帯11種（`content/world.ts` の fstyle/wstyle）。
+- 保存キー：`gunyu3:campaign`・`gunyu3:run`・`gunyu3:turnstart`・`gunyu3:settings`。`sw.js` のキャッシュ名 `gunyu-no-kuni-v6-roguelike`。
+- 検証：`npm run test`（Vitest 97件）、`FUZZ_RUNS=80` の総当たり、`BALANCE=6`（6回とも黒淵を討伐・23〜52ターン・朔Lv29〜33、城攻めの勝率はボットで30〜70%）、内蔵ブラウザ（375×812）でタイトル→本陣→城攻め→登用→敵襲→合戦→城下・武将。
+- 未検証：Pixel 実機の操作感、人が通しで遊んだ時の難易度。
+
+---
+
 ## 最終更新
 2026-05-16（スマホ画面/マップ/合戦演出/NPC行動表示を反映）
 

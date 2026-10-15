@@ -1,10 +1,10 @@
-// 群雄ノ國：掌中戦記 v2.1 Service Worker
+// 群雄ノ國：掌中戦記 v3.0 Service Worker（国盗り×迷宮）
 // - APP SHELL は事前キャッシュ
 // - 立ち絵 (/assets/portraits/) は network-first（新規追加が即反映されるため）
 // - その他 GET リクエストは cache-first（バンドルアセット等）
 // - 失敗レスポンス（4xx/5xx）はキャッシュしない
 
-const CACHE_NAME = 'gunyu-no-kuni-v5-mobile-assets';
+const CACHE_NAME = 'gunyu-no-kuni-v6-roguelike';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg'];
 
 self.addEventListener('install', (event) => {

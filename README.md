@@ -1,105 +1,85 @@
-# 群雄ノ國：掌中戦記
+# 群雄ノ國：掌中戦記 3.0 ── 国盗り迷宮絵巻
 
-## 概要
-「群雄ノ國：掌中戦記」は、スマホブラウザ向けの和風戦国ファンタジー国取りターン制シミュレーションゲームです。プレイヤーは小国「暁ノ家」を率い、内政、徴兵、訓練、探索、登用、進軍を選びながら八州統一を目指します。
+スマホ縦画面向けの、和風「国盗り×不思議のダンジョン」です。八洲十五国の地図で攻める国を選び、その国の城（3〜7階の迷宮）を一手ずつ攻め上がります。天守の城主を討てば国が手に入り、捕らえた武将は家臣になります。黄泉沼の蛟王黒淵を討てば結末、全国を取れば天下統一。
 
-## 主な機能
-- 12地域、プレイヤー勢力1、NPC勢力4、浪人枠1による国取りSLG
-- 1ターン3APの軽量ターン制
-- 内政、徴兵、訓練、探索、登用、進軍、休養
-- 武将20人以上、能力値、スキル、兵数、スタミナ、忠誠
-- NPC勢力の自律行動
-- 勝利/敗北条件と結果画面
-- localStorageによる手動セーブ、自動セーブ、ロード、削除
-- スマホ縦画面を優先したカードUI
-- イラスト調の国絵図、武将デザインシート、SVGミニキャラによる戦闘画面
-- Cloudflare Pages公開用設定
-- Netlify互換設定
-- PWA manifestと簡易Service Worker
+- 公開URL：https://gunyu-no-kuni-shochu-senki-cloudflare-final-20260506-11285.pages.dev/
+- GitHub `hiro53y/gunyu_no_kuni_shochu_senki_cloudflare_final_20260506_112855` の main に push すると、Cloudflare Pages（Git連携）が自動でビルド・公開します。
+- このフォルダ `deliverables/gunyu_no_kuni_shochu_senki_cloudflare_final_20260506_112855` がリポジトリ本体です（フォルダ名・場所は変えない）。
+- React 19 ＋ TypeScript ＋ Vite 7。迷宮と地図は Canvas 2D。サーバーは使わず、保存は端末の localStorage。
+- 2.x（国取りSLG）のソースは `archive/v2.1/` に残しています（ビルドには入らない）。
+- 名前・台詞・絵はすべて独自。既存作品の固有名詞・画像は使っていません。
 
-## 技術スタック
-- Vite
-- React
-- TypeScript
-- CSS
-- Node.js標準実行による軽量エンジンテスト
-- localStorage
-- Cloudflare Pages
-- Netlify互換
+## 遊びの中身
 
-## ローカル起動方法
+| 要素 | 内容 |
+|---|---|
+| 本陣 | 1季節に行動3回。出陣・修行（妖魔の巣）・内政（開発・城・兵）・交流（絆）。城下（蔵・装備・商人・鍛冶・浪人宿）は行動を使わない |
+| 地図 | 八洲十五国・8勢力。国の中心からの距離で塗り分けた国境、街道、攻められる国の印、攻めてくる敵の矢印 |
+| 城攻め | 3〜7階の迷宮。勢力ごとの兵（10系統×3段階）と妖怪（16系統×3段階）。中の階に2人目の将、最上階の天守に城主。撤退すると登った階まで城門が破れたまま残る |
+| 武将 | 固有22名＋名もなき侍大将。部隊に2人まで。槍・弓・鉄砲・刀の戦い方。倒れても死なず傷を負う。レベルは戦をまたいで残る |
+| 技 | 約50種。一直線・周り・見えている敵・部隊全体の回復や守り・寝返りなど。敵の将も使う |
+| 捕縛と登用 | 倒した将を家臣に迎えるか解き放つ。忠義の将は主家が滅ぶまで牢 |
+| 敵の手番 | 隣の勢力が攻めてくる。自ら迎え撃つ（1階の合戦）か籠城。8季節目から妖魔の群が目覚め、人の国も呑み込む |
+| できごと | 開幕・初勝利・妖魔の目覚め・勢力の滅亡・登用・絆（各武将2話）・結末。立ち絵つきの会話 |
+| 迷宮の仕組み | 前作「不思議なダンジョンもどき」から：8方向、未識別、合成、旅の商人の店、罠、モンスターハウス、満腹度、ダッシュ、タップで調べる |
+| 負け | 本拠の暁原を失うと落城。その季節の始めからやり直せる |
+
+## 操作
+
+スマホ：十字パッド・A（攻撃）・B（ダッシュ）、上の段に 道具・技・矢・向き・地図・状態。上に並ぶ部隊の顔を押しても技の一覧が出ます。
+
+PC：矢印・WASD・QEZC（斜め）・テンキー、Shift＋方向でダッシュ、Space 攻撃、X 足踏み、R 休む、I 道具、T 技、G 階段、V 矢、F 向き、M 地図、L 記録、Esc メニュー。
+
+## 開発
+
 ```bash
 npm install
-npm run dev
+npm run dev        # 開発サーバー
+npm run test       # Vitest（単体テスト・地図2,000通り・自動プレイの総当たり・国盗りの序盤）
+npm run build      # tsc → vite build → dist/
 ```
 
-OneDrive配下などでViteの依存最適化が `EPERM` になる場合は、同期が落ち着いてから再実行するか、プロジェクトを同期対象外のローカルフォルダに置いてください。Netlify用の本番buildは `npm run build` で確認済みです。
+- `FUZZ_RUNS=80 npx vitest run tests/fuzz.test.ts`：でたらめな操作と上手なボットの自動プレイを増やして総当たり。
+- `BALANCE=6 npx vitest run tests/balance.test.ts`：国盗りを最初から最後まで自動で遊ばせて、勝つまでのターン・城攻めの勝率を集計。
+- `CAMPAIGN=4 npx vitest run tests/campaign.test.ts`：通しの自動プレイ（不変条件の検査つき）。
+- 開発サーバーで `?bot=1` を付けると、冒険の画面で自動プレイ。`?gallery` で駒・兵・妖怪・床と壁の絵を一覧。`window.__game.goto(階)`・`window.__camp`。どれも本番のビルドには入りません。
+- 立ち絵から駒（`public/assets/tokens/`）と会話用の軽い絵（`public/assets/busts/`）を作るのは `python scripts/make-tokens.py`。
 
-## build方法
-```bash
-npm run build
+## 構成
+
+```text
+src/
+  content/   データ：sengoku（国・勢力）、generals（武将と台詞）、skills（技）、monsters（兵と妖怪）、items、world（罠・城の見た目）
+  engine/    迷宮（DOM に依存しない純粋な TS。seed 付き乱数で決定的）
+    run.ts 冒険の作り方・階の移動   mapgen.ts 階・天守・合戦の野   generals.ts 武将の強さ・経験
+    skills.ts 技（味方も敵も同じ仕組み）   ai.ts 敵・味方の動き   step.ts 1手の進行   save.ts 保存
+  campaign/  国盗り：state（型）、campaign（出陣・結果・内政・交流・城下・ターン・敵の手番・称号）、events（物語）
+  render/    Canvas の描画（地形・駒・兵・演出・ミニマップ）
+  ui/        画面（タイトル・本陣・地図・編成・冒険・技・武将・城下・会話・結果）
+tests/       Vitest：engine / features / mapgen / generals / campaign / fuzz / balance、bot（迷宮）・campaignBot（国盗り）
+public/
+  assets/portraits/  立ち絵（元の絵）  assets/tokens/ 駒  assets/busts/ 会話の絵
+  assets/sprites/v2/ 妖怪・道具・罠の絵  assets/sounds/bgm/ BGM 5曲
+  manifest.webmanifest（start_url "/" は変えない）/ sw.js / _headers
 ```
 
-## テスト方法
-```bash
-npm run test
-```
+## 保存
 
-## Cloudflare Pagesデプロイ設定
-Cloudflare Pagesのサイト設定では以下を指定します。
+| キー | 内容 |
+|---|---|
+| `gunyu3:campaign` | 本陣（国盗り） |
+| `gunyu3:run` | 出陣中の冒険（毎手） |
+| `gunyu3:turnstart` | 季節の始めの写し（落城した時のやり直し用） |
+| `gunyu3:settings` | 音量・速さ・文字の大きさ |
+
+2.x の保存データは読み込みません（消しもしません）。
+
+## Cloudflare Pages の設定
 
 | 項目 | 値 |
 |---|---|
-| Framework preset | React / Vite |
 | Build command | `npm run build` |
 | Build output directory | `dist` |
-| Root directory | `/` |
-| Node.js | `.node-version` の `22.16.0` |
+| Node.js | `.node-version`（22.16.0） |
 
-Cloudflare Pagesは、トップレベルの `404.html` がないSPAを自動的にルートへフォールバックします。そのため、広い `/* /index.html 200` の `_redirects` は置いていません。Cloudflare Pagesでは `_redirects` が既存アセットにも適用されるため、Viteの `/assets/...` を壊す可能性があります。
-
-`public/_headers` にCloudflare Pages向けのキャッシュとセキュリティヘッダーを定義済みです。
-
-CLIで直接アップロードする場合は、Cloudflareにログイン済みの状態で以下を実行します。
-
-```bash
-npm run deploy:cloudflare
-```
-
-## Netlify互換設定
-`netlify.toml` は互換用に残しています。Netlifyを使う場合も `npm run build` と `dist` です。
-
-## GitHub運用メモ
-1. GitHubで空リポジトリを作成する。
-2. このフォルダをGit管理し、初回コミットを作成する。
-3. GitHubへpushする。
-4. Cloudflare PagesでGitHubリポジトリを接続し、自動デプロイを有効化する。
-
-GitHubにアップする対象は `src/`、`public/`、`tests/`、`docs/`、設定ファイル、READMEです。`public/assets/art/` のPNGはアプリ表示に必要な同梱アセットなので含めます。`node_modules/`、`dist/`、`out/`、`deliverables/`、`.git/` はアップしません。詳しくは `docs/cloudflare_pages.md` を参照してください。
-
-## 操作方法
-- 上部ヘッダーでターン、金、兵糧、AP、支配地域数を確認します。
-- 地図タブで国絵図上の地域を選択します。
-- 武将タブで行動に参加する武将を最大3人まで選択します。
-- 下部アクションバーから内政、徴兵、訓練、探索、進軍、休養、ターン終了を実行します。
-- 進軍は隣接する敵領を選択してから実行します。
-- 探索で浪人を発見した場合、地域詳細から登用できます。
-
-## アセット仕様
-- `public/assets/art/map-design-sheet.png` は地図タブとタイトル画面で使用します。
-- `public/assets/art/character-design-sheet.png` はタイトル画面と武将カードで使用します。
-- 戦闘画面のミニキャラは `src/components/BattleMiniSprite.tsx` の自作SVGで生成します。
-- 外部有料素材やランタイム画像生成APIには依存しません。
-
-## セーブ仕様
-- 手動セーブとターン進行時の自動セーブに対応します。
-- セーブデータにはversionを持たせます。
-- JSON parse失敗や不正なversionの場合はロード失敗として扱い、画面が真っ白にならないようにします。
-
-## 今後の拡張案
-- 地域数と勢力数の拡張
-- 武将イベントと固有シナリオ
-- 複数セーブスロット
-- 難易度ごとの詳細バランス調整
-- 戦闘演出の追加
-- アクセシビリティ改善
+広い `_redirects` は置きません（`/assets` の配信を壊すため）。

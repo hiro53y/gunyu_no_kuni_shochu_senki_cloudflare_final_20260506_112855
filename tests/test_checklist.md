@@ -1,64 +1,30 @@
-# テストチェックリスト
+# テストチェックリスト（3.0）
 
-## 自動テスト
-- [x] 戦闘計算が結果を返す
-- [x] 内政で国力と建設レベルが増える
-- [x] 徴収で金が増え、満足度が下がる
-- [x] 進軍勝利時に地域支配が変わる
-- [x] 登用で浪人を雇用できる
-- [x] セーブデータのserialize/deserializeができる
-- [x] 壊れたセーブデータを拒否する
-- [x] 勝利条件を判定できる
-- [x] 25ターンのスモーク進行で状態が壊れない
-- [x] 序盤5ターンで支配地域が不自然に0にならない
-- [x] ターン終了時にNPC勢力の行動が作戦記に残る
-- [x] 出陣前の戦力予測が危険度と勝率を返す
-- [x] 調略とAP消費が現在APIで動く
-- [x] 武将portraitKeyが既存画像に紐づいている
-- [x] 古いセーブのportraitKeyを現行画像キーへ補正する
+## 自動テスト（`npm run test`）
+- [x] 迷宮：移動と角・戦闘・道具・壺と合成・店（拾うボタン・逃げると商人が追う）・罠・空腹・突風・保存と再現（tests/engine.test.ts）
+- [x] 壁の中の仲間とは入れ替われない
+- [x] 化け狸・新しい道具・自動の向き・整頓・壁掘り（tests/features.test.ts）
+- [x] 地図：2,000通りの階でつながり・階段・店・敵の配置、天守の将と護衛、合戦の野のつながり、勢力ごとの兵の顔ぶれ（tests/mapgen.test.ts）
+- [x] 武将：強さ・部隊の配置・弓と槍・退く・経験とレベル・技の待ち・すべての技（味方と敵）・買収・守り・城主を討って勝ち・中の階の将の持ち越し・城門・合戦・援軍（tests/generals.test.ts）
+- [x] 国盗り：国のデータ・出陣と結果・負けた時の持ち物・撤退と城門・忠義の将の牢と帰順・解き放ちと雇用・黒淵で結末・ターン・敵襲と籠城・妖魔の目覚め・内政・交流・城下・保存（tests/campaign.test.ts）
+- [x] 自動プレイ：でたらめな操作（城攻め・合戦・修行・道場）で例外と不変条件の違反0、上手なボットが城を落とせる（tests/fuzz.test.ts）
+- [x] 国盗りの序盤12ターンを自動で遊んで壊れない（保存→読み込みを毎ターン）
+
+## 集計（必要な時だけ）
+- [x] `FUZZ_RUNS=80`：総当たりの回数を増やす
+- [x] `BALANCE=6`：最初から最後まで6回（2026-10-15：6回とも黒淵を討伐、23〜52ターン、朔Lv29〜33）
 
 ## build
-- [ ] 公開用コピーで `npm run build`（2026-05-16: `tsc -b` 通過後、Vite/esbuild `spawn EPERM` で停止）
-- [x] 検証用deliverables内で `npm run build`
-- [x] Cloudflare検証用deliverables内で `npm run build`
+- [x] `npx tsc -p tsconfig.app.json --noEmit`
+- [x] `npm run build`
 
-## 起動確認
-- [x] build済み `dist` のトップページを簡易HTTPサーバーで配信し、HTTP 200を確認
-- [x] Cloudflare検証用distの `/`、manifest、Service Worker、icon、JS、CSS がHTTP 200を返すことを確認
-- [ ] 実機スマホまたはブラウザでのタップ操作確認
+## 画面（内蔵ブラウザ・375×812）
+- [x] タイトル → 開幕のできごと → 本陣の地図
+- [x] 千歳森を攻める → 編成 → 城の中で駒と兵 → 天守で鉄心を討つ → 結果 → 初勝利のできごと → 登用
+- [x] 季節を進める → 敵襲 → 自ら迎え撃つ（合戦）→ 撃退・大将を捕らえる
+- [x] 城下（蔵・鍛冶・浪人宿）・武将の一覧と詳細
+- [x] `?bot=1` の自動プレイでコンソールのエラー0
 
-## パッケージ
-- [x] `deliverables/gunyu_no_kuni_shochu_senki_final_20260506_110019/` を作成
-- [x] 最終パッケージに `node_modules`、`dist`、`out/test-build`、`tsconfig.tsbuildinfo` が含まれないことを確認
-- [x] `deliverables/gunyu_no_kuni_shochu_senki_cloudflare_final_20260506_112855/` を作成
-- [x] Cloudflare最終パッケージに `node_modules`、`dist`、`out/test-build`、`.git` が含まれないことを確認
-
-## Cloudflare Pages
-- [x] `public/_headers` が `dist/_headers` に出力されることを確認
-- [x] `dist/_redirects` が存在しないことを確認
-- [x] `.node-version` を追加
-- [x] `docs/cloudflare_pages.md` を追加
-- [x] Service Worker構文チェック
-- [x] manifest JSON parseチェック
-
-## 既知の環境差分
-- [ ] OneDrive配下ではVite dev serverの依存最適化キャッシュ操作で `EPERM` が出る場合がある
-- [ ] ルートの `git init` はOneDrive権限/ロックで失敗。不完全な `.git` は最終成果物には含めていない
-
-## 2026-05-13 追加確認
-- [x] `npm test` で現行v2.1向けエンジンテスト9件が通過
-- [x] `npx tsc -b --pretty false` がエラーなし
-- [x] NPC侵攻がプレイヤー絡みでも作戦記に出ることを自動テストで確認
-- [x] CharacterPortrait追加後も全武将表示の型チェックが通過
-- [x] 1ターン目終了で即敗北しないことを自動テストで確認
-- [x] `npm test` は14件通過
-- [ ] `npm run build` は TypeScript 後の Vite/esbuild 実行ファイル起動が `spawn EPERM` で停止。Cloudflare Pages/通常PC環境で再確認する
-
-## 2026-05-16 スマホ画面/演出改修確認
-- [x] `npx tsc --noEmit -p tsconfig.json` がエラーなし
-- [x] `npm run test` は15件通過
-- [x] `npm run dev -- --host 127.0.0.1` のローカルHTTP 200を確認
-- [x] スマホ作戦記表示、地域選択時の所属武将表示、斬撃/被弾SE追加後も `npx tsc --noEmit -p tsconfig.json` がエラーなし
-- [x] スマホ作戦記表示、地域選択時の所属武将表示、斬撃/被弾SE追加後も `npm run test` は15件通過
-- [ ] `npm run build` は `tsc -b` 通過後、Vite/esbuild `spawn EPERM` で停止。OneDrive/Windows子プロセス制限のためCloudflare Pages/通常PC環境で再確認する
-- [ ] ブラウザスクリーンショット確認はBrowserツールが今回ロードできず未実施
+## 実機で確かめたいこと（未）
+- [ ] Pixel での操作感・文字の大きさ・音
+- [ ] 人が通しで遊んだ時の難易度（序盤の城主の強さ、終盤の黄泉沼）

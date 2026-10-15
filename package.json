@@ -1,15 +1,16 @@
 {
   "name": "gunyu-no-kuni-shochu-senki",
-  "version": "0.1.0",
+  "version": "3.0.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "scripts": {
-    "dev": "vite --config vite.config.js --configLoader native",
-    "build": "tsc -b && node scripts/vite-build.mjs",
-    "preview": "vite preview --config vite.config.js --configLoader native --host 127.0.0.1",
-    "deploy:cloudflare": "npm run build && npx wrangler pages deploy dist",
-    "build:test": "tsc -p tsconfig.test.json",
-    "test": "npm run build:test && node tests/write-test-package.cjs && node out/test-build/tests/gameEngine.test.js"
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "vitest run"
   },
   "dependencies": {
     "react": "^19.2.0",
@@ -21,6 +22,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
     "typescript": "^5.9.3",
-    "vite": "^7.2.6"
+    "vite": "^7.2.6",
+    "vitest": "^3.2.4"
   }
 }

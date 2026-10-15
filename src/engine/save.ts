@@ -1,133 +1,144 @@
-// ===========================================================================
-// セーブ・ロードエンジン v2.1
-// localStorage を使用。version mismatch やJSON破損で画面が真っ白にならないよう、
-// 失敗時は { ok: false } を返し呼び出し側で復帰可能にする。
-// ===========================================================================
+// 保存：本陣（国盗り）・出陣中の冒険（毎ターン）・ターンの始めの写し・設定。壊れたデータは読み込まない
+import { ITEM_BY_ID } from '../content/items';
+import { MON_BY_ID } from '../content/monsters';
+import { REGIONS } from '../content/sengoku';
+import { CAMPAIGN_VERSION, DEFAULT_SETTINGS, type Campaign, type Settings } from '../campaign/state';
+import { RUN_VERSION } from './run';
+import type { Item, Run } from './types';
 
-import { SAVE_VERSION, type GameState, type SaveData } from '../types/game';
-import { normalizePortraitKey } from '../data/portraitKeys';
+export const KEY_RUN = 'gunyu3:run';
+export const KEY_CAMPAIGN = 'gunyu3:campaign';
+export const KEY_SNAPSHOT = 'gunyu3:turnstart';
+export const KEY_SETTINGS = 'gunyu3:settings';
 
-const SAVE_KEY = 'gunyu_no_kuni_save_v21';
-const AUTO_SAVE_KEY = 'gunyu_no_kuni_autosave_v21';
-
-export interface LoadResult {
-  ok: boolean;
-  state: GameState | null;
-  error: string | null;
+export interface KV {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
 }
 
-function storageAvailable(): boolean {
+function store(): KV | null {
   try {
-    return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+    return (globalThis as { localStorage?: KV }).localStorage ?? null;
   } catch {
-    return false;
+    return null;
   }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+function validItems(items: unknown): boolean {
+  if (!Array.isArray(items)) return false;
+  return items.every((i) => {
+    const item = i as Item;
+    return item && typeof item.uid === 'number' && typeof item.id === 'string' && !!ITEM_BY_ID[item.id] && (!item.contents || validItems(item.contents));
+  });
 }
 
-/** GameState の最低限の整合性チェック */
-function validateGameState(value: unknown): value is GameState {
-  if (!isRecord(value)) return false;
-  if (typeof value.turn !== 'number') return false;
-  if (typeof value.ap !== 'number') return false;
-  if (!isRecord(value.factions)) return false;
-  if (!isRecord(value.regions)) return false;
-  if (!isRecord(value.generals)) return false;
-  if (!Array.isArray(value.log)) return false;
-  if (!Array.isArray(value.prisoners)) return false;
-  if (!Array.isArray(value.roninPool)) return false;
+/** 読み込んだ冒険が、今の版で遊べる形か */
+export function validRun(value: unknown): value is Run {
+  const run = value as Run;
+  if (!run || run.v !== RUN_VERSION) return false;
+  if (!run.player || !run.floor || !Array.isArray(run.monsters) || !Array.isArray(run.log) || !run.gens || !Array.isArray(run.party)) return false;
+  const f = run.floor;
+  if (!Array.isArray(f.tiles) || f.tiles.length !== f.w * f.h || !Array.isArray(f.seen) || f.seen.length !== f.tiles.length) return false;
+  if (!validItems(run.player.inv) || !validItems(f.items.map((fi) => fi.item))) return false;
+  if (!run.monsters.every((m) => !!MON_BY_ID[m.id] && (!m.gen || !!run.gens[m.gen]))) return false;
+  for (const n of [run.player.hp, run.player.maxHp, run.player.lv, run.player.hunger, run.rng, run.turn, run.floorNo]) {
+    if (typeof n !== 'number' || !Number.isFinite(n)) return false;
+  }
   return true;
 }
 
-function normalizeLoadedState(state: GameState): GameState {
-  const generals = { ...state.generals };
-  for (const [id, general] of Object.entries(state.generals)) {
-    const portraitKey = normalizePortraitKey(general);
-    if (general.portraitKey !== portraitKey) {
-      generals[id] = { ...general, portraitKey };
-    }
-  }
-  return { ...state, generals };
-}
-
-export function serializeGameState(state: GameState): string {
-  const saveData: SaveData = {
-    version: SAVE_VERSION,
-    createdAt: new Date().toISOString(),
-    state: { ...state, meta: { ...state.meta, lastSavedAt: new Date().toISOString() } },
-  };
-  return JSON.stringify(saveData);
-}
-
-export function deserializeSaveData(raw: string): LoadResult {
+export function deserializeRun(text: string | null): Run | null {
+  if (!text) return null;
   try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!isRecord(parsed)) {
-      return { ok: false, state: null, error: 'セーブデータの形式が不正です' };
-    }
-    if (parsed.version !== SAVE_VERSION) {
-      return { ok: false, state: null, error: `セーブデータのversionが対応していません（${parsed.version}）` };
-    }
-    if (!isRecord(parsed.state)) {
-      return { ok: false, state: null, error: 'セーブデータにゲーム状態が含まれていません' };
-    }
-    if (!validateGameState(parsed.state)) {
-      return { ok: false, state: null, error: 'ゲーム状態の整合性チェックに失敗しました' };
-    }
-    return { ok: true, state: normalizeLoadedState(parsed.state), error: null };
+    const run = JSON.parse(text) as Run;
+    return validRun(run) ? run : null;
   } catch {
-    return { ok: false, state: null, error: 'セーブデータの読み込みに失敗しました（JSON破損の可能性）' };
+    return null;
   }
 }
 
-function setItem(key: string, state: GameState): { ok: boolean; message: string } {
-  if (!storageAvailable()) return { ok: false, message: 'localStorageを利用できません' };
+export function validCampaign(value: unknown): value is Campaign {
+  const c = value as Campaign;
+  if (!c || c.v !== CAMPAIGN_VERSION) return false;
+  if (!c.regions || REGIONS.some((r) => !c.regions[r.id]) || !c.gens || !c.lord || !c.factions) return false;
+  if (!validItems(c.store)) return false;
+  for (const n of [c.turn, c.ap, c.gold, c.rng, c.lord.lv, c.lord.maxHp]) if (typeof n !== 'number' || !Number.isFinite(n)) return false;
+  return true;
+}
+
+export function deserializeCampaign(text: string | null): Campaign | null {
+  if (!text) return null;
   try {
-    window.localStorage.setItem(key, serializeGameState(state));
-    return { ok: true, message: 'セーブしました' };
+    const c = JSON.parse(text) as Campaign;
+    if (!validCampaign(c)) return null;
+    // 足りない項目は補う（版の中での追加）
+    c.scenes ??= [];
+    c.invasions ??= [];
+    c.captives ??= [];
+    c.flags ??= {};
+    c.titles ??= {};
+    c.news ??= [];
+    return c;
   } catch {
-    return { ok: false, message: 'セーブに失敗しました（容量・ブラウザ設定をご確認ください）' };
+    return null;
   }
 }
 
-function getItem(key: string): LoadResult {
-  if (!storageAvailable()) return { ok: false, state: null, error: 'localStorageを利用できません' };
+function put(kv: KV | null, key: string, value: string | null) {
+  if (!kv) return;
   try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return { ok: false, state: null, error: 'セーブデータがありません' };
-    return deserializeSaveData(raw);
+    if (value === null) kv.removeItem(key);
+    else kv.setItem(key, value);
   } catch {
-    return { ok: false, state: null, error: 'ロード中にブラウザエラーが発生しました' };
+    // 容量不足などで保存できなくても遊びは続ける
   }
 }
 
-function removeItem(key: string): { ok: boolean; message: string } {
-  if (!storageAvailable()) return { ok: false, message: 'localStorageを利用できません' };
+function get(kv: KV | null, key: string): string | null {
+  if (!kv) return null;
   try {
-    window.localStorage.removeItem(key);
-    return { ok: true, message: '削除しました' };
+    return kv.getItem(key);
   } catch {
-    return { ok: false, message: '削除に失敗しました' };
+    return null;
   }
 }
 
-// --- 公開API ----------------------------------------------------------------
-
-export function saveGame(state: GameState) { return setItem(SAVE_KEY, state); }
-export function loadGame(): LoadResult { return getItem(SAVE_KEY); }
-export function deleteSave() { return removeItem(SAVE_KEY); }
-export function hasSave(): boolean {
-  if (!storageAvailable()) return false;
-  return window.localStorage.getItem(SAVE_KEY) !== null;
+export function saveRun(run: Run | null, kv: KV | null = store()) {
+  put(kv, KEY_RUN, run ? JSON.stringify(run) : null);
 }
 
-export function autoSaveGame(state: GameState) { return setItem(AUTO_SAVE_KEY, state); }
-export function loadAutoSave(): LoadResult { return getItem(AUTO_SAVE_KEY); }
-export function deleteAutoSave() { return removeItem(AUTO_SAVE_KEY); }
-export function hasAutoSave(): boolean {
-  if (!storageAvailable()) return false;
-  return window.localStorage.getItem(AUTO_SAVE_KEY) !== null;
+export function loadRun(kv: KV | null = store()): Run | null {
+  return deserializeRun(get(kv, KEY_RUN));
+}
+
+export function saveCampaign(c: Campaign | null, kv: KV | null = store()) {
+  put(kv, KEY_CAMPAIGN, c ? JSON.stringify(c) : null);
+}
+
+export function loadCampaign(kv: KV | null = store()): Campaign | null {
+  return deserializeCampaign(get(kv, KEY_CAMPAIGN));
+}
+
+/** ターンの始めの写し（負けた時にやり直す） */
+export function saveSnapshot(c: Campaign | null, kv: KV | null = store()) {
+  put(kv, KEY_SNAPSHOT, c ? JSON.stringify(c) : null);
+}
+
+export function loadSnapshot(kv: KV | null = store()): Campaign | null {
+  return deserializeCampaign(get(kv, KEY_SNAPSHOT));
+}
+
+export function saveSettings(s: Settings, kv: KV | null = store()) {
+  put(kv, KEY_SETTINGS, JSON.stringify(s));
+}
+
+export function loadSettings(kv: KV | null = store()): Settings {
+  try {
+    const raw = get(kv, KEY_SETTINGS);
+    if (!raw) return { ...DEFAULT_SETTINGS };
+    return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<Settings>) };
+  } catch {
+    return { ...DEFAULT_SETTINGS };
+  }
 }
