@@ -15,11 +15,12 @@ export function SettingsBody({ settings, onChange }: { settings: Settings; onCha
         <input type="range" min={0} max={1} step={0.05} value={settings.se} onChange={(e) => set({ se: Number(e.target.value) })} />
         <span className="val">{Math.round(settings.se * 100)}</span>
       </label>
-      <label className="setting-row">
-        <span>動きを速く</span>
-        <input type="checkbox" checked={settings.anim !== 0} onChange={(e) => set({ anim: e.target.checked ? 1 : 0 })} />
-        <span className="val">{settings.anim !== 0 ? '速い' : 'ふつう'}</span>
-      </label>
+      <div className="setting-row">
+        <span>合戦の演出</span>
+        <div className="seg" role="group" aria-label="合戦の演出速度">
+          {([0, 1, 2] as const).map(anim => <button key={anim} aria-pressed={settings.anim === anim} className={settings.anim === anim ? 'on' : ''} onClick={() => set({ anim })}>{['ふつう', '速い', 'なし'][anim]}</button>)}
+        </div>
+      </div>
       <div className="setting-row">
         <span>文字の大きさ</span>
         <div className="seg">
