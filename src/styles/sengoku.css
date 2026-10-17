@@ -411,3 +411,25 @@ button.primary:disabled { filter: grayscale(0.7) brightness(0.6); }
   .bp-name { font-size: 0.6rem; }
   .bp-troops { font-size: 0.74rem; }
 }
+
+/* v5 軍議 */
+.council-open{display:flex;justify-content:space-between;gap:10px;align-items:center;width:100%;padding:9px 12px;background:linear-gradient(90deg,#432c20,#231914);color:#f4deac;border:0;border-bottom:1px solid #8a6942;font-weight:800;text-align:left}.council-open small{font-weight:400;font-size:.72rem}.council-card{padding:12px;margin:9px 0;border:1px solid #604c35;border-radius:10px;background:#201914}.council-card p{margin:6px 0;font-size:.85rem;line-height:1.6}.council-card small{display:block;margin-top:5px;color:#c7b9a3}.council-card button,.modal select{padding:9px;border:1px solid #806743;border-radius:6px;background:#35281b;color:#f5e7c8}.council-team{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}.council-team label{padding:7px;background:#30251e;font-size:.8rem}.council-team input{margin-right:5px}.council-message{padding:10px;border-left:3px solid #dfc47b;background:#39301a}.council-person{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:.8rem}.reserve{padding:10px;background:#352a19;color:#f0d597;line-height:1.6}.activity{color:#d7bd85}.legacy-summary{font-size:.78rem;color:#dfca96}
+
+/* v5 彩色軍記絵図。SVGの国境とタップ領域を共用 */
+.illustrated-map{background:#102e36}.map-tools{display:flex;align-items:center;gap:5px;padding:5px 8px;background:#251c15;color:#e3cd9a;font-family:var(--mincho);font-size:.8rem}.map-tools span{margin-right:auto}.map-tools button{padding:4px 11px;background:#493623;border:1px solid #967547;border-radius:4px;color:#f5e0b2;min-height:30px}.map-viewport{width:100%;aspect-ratio:1;overflow:auto;overscroll-behavior:contain}.map-art{display:block;max-width:none;height:auto;min-width:100%;touch-action:pan-x pan-y}.map-country{cursor:pointer;transition:fill-opacity .15s}.map-country:hover,.map-country:focus{fill-opacity:.35;outline:none;stroke:#fff1ac;stroke-width:.6}.map-castle{cursor:pointer;outline:none}.map-castle:focus circle{stroke:#fff}.map-name{font-size:2.85px;font-family:var(--mincho);font-weight:900;fill:#fff1d2;stroke:#332419;stroke-width:.28px;paint-order:stroke;stroke-linejoin:round}.map-legend{margin:0;padding:5px 8px;color:#dbc99e;background:#221a13;font-size:.65rem}
+@media(min-width:900px){.honjin{max-width:760px}.map-viewport{max-height:65dvh;aspect-ratio:auto}.map-art{width:100%}}
+
+/* Hand-painted full-body sprites are rendered at native display resolution. */
+.bfield-canvas{image-rendering:auto}.battle-screen{max-width:1100px;margin:auto}.bfield-box{min-height:225px}.bp-name{font-size:clamp(.62rem,1.6vw,.85rem)}
+@media(max-height:650px){.bfield-box{min-height:155px}.bp-cell{min-height:40px}.bf-tools button{padding:4px}}
+
+/* 横向きの低い画面では戦場と操作盤を左右に分け、技を画面内に収める。 */
+@media (orientation:landscape) and (max-height:600px) and (min-width:600px){
+ .battle-screen{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,44%);grid-template-rows:auto auto minmax(0,1fr)}
+ .bhead{grid-column:1 / -1;grid-row:1}
+ .bfield-box{grid-column:1;grid-row:2 / 4;min-height:0}
+ .bpanels{grid-column:2;grid-row:2;padding-top:2px}
+ .bfoot{grid-column:2;grid-row:3;min-height:0;overflow:auto;align-content:start}
+ .bp-cell{min-height:37px}.bf-who{font-size:.7rem}.bf-who small{font-size:.6rem}.bf-hint{font-size:.65rem}
+ .bf-chips .chip{padding:4px;font-size:.7rem}.bf-chips{gap:3px}.bf-tools button{padding:4px}
+}

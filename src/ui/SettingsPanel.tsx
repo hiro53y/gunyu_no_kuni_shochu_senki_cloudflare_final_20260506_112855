@@ -17,8 +17,8 @@ export function SettingsBody({ settings, onChange }: { settings: Settings; onCha
       </label>
       <label className="setting-row">
         <span>動きを速く</span>
-        <input type="checkbox" checked={settings.fast} onChange={(e) => set({ fast: e.target.checked })} />
-        <span className="val">{settings.fast ? '速い' : 'ふつう'}</span>
+        <input type="checkbox" checked={settings.anim !== 0} onChange={(e) => set({ anim: e.target.checked ? 1 : 0 })} />
+        <span className="val">{settings.anim !== 0 ? '速い' : 'ふつう'}</span>
       </label>
       <div className="setting-row">
         <span>文字の大きさ</span>

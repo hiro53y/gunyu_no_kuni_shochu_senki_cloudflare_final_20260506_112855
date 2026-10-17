@@ -4,7 +4,7 @@ import { KINDS } from '../battle/kinds';
 import type { Kind } from '../battle/types';
 import { playSe } from '../audio/sound';
 
-export const ASSET_VERSION = '20261016';
+export const ASSET_VERSION = '20261017-v5';
 
 /** 会話・札に使う立ち絵（軽い WebP） */
 export function bustUrl(portrait: string): string {

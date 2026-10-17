@@ -1,4 +1,5 @@
 // 陣立て：出す武将（6部隊まで）を前衛・後衛の枠に置く。敵の顔ぶれと戦場も見える。朔の部隊が壊滅すると終わり
+import { activity, canAct } from '../campaign/strategy';
 import { useMemo, useState } from 'react';
 import { regionDef } from '../content/sengoku';
 import { LORD } from '../content/generals';
@@ -26,7 +27,7 @@ const key = (row: number, slot: number) => `${row}${slot}`;
 
 export function Formation({ c, mode, region, seed, inv, onGo, onClose }: { c: Campaign; mode: BattleKind; region: string; seed: number; inv?: Invasion; onGo: (party: Placement[]) => void; onClose?: () => void }) {
   const ready = Object.values(c.gens).filter((g) => g.status === 'ours');
-  const usable = (id: string) => c.gens[id].injured <= 0 && c.gens[id].troops > 0;
+  const usable = (id: string) => canAct(c,id) && c.gens[id].troops > 0;
   const [slots, setSlots] = useState<Record<string, string>>(() => {
     const score = (id: string) => { const p = genPower(c, id); return (p.atk + p.def + p.int) * Math.sqrt(c.gens[id].troops); };
     const others = ready.filter((g) => g.id !== LORD && usable(g.id)).sort((a, b) => score(b.id) - score(a.id));
@@ -34,9 +35,6 @@ export function Formation({ c, mode, region, seed, inv, onGo, onClose }: { c: Ca
     const list = [...(withLord ? [c.gens[LORD]] : []), ...others].slice(0, MAX_PARTY);
     const out: Record<string, string> = {};
     for (const p of autoPlace(list.map((g) => ({ id: g.id, kind: g.kind })))) out[key(p.row, p.slot)] = p.gen;
-    // 朔は後衛へ（空きがあれば）
-    const lk = Object.keys(out).find((k) => out[k] === LORD);
-    if (lk && lk[0] === '0') { const free = ['11', '10', '12'].find((k) => !out[k]); if (free) { out[free] = LORD; delete out[lk]; } }
     return out;
   });
   const [sel, setSel] = useState<string | null>(null);
@@ -48,6 +46,7 @@ export function Formation({ c, mode, region, seed, inv, onGo, onClose }: { c: Ca
   const ground = groundOf(c, mode, region, mode === 'siege' ? c.regions[region].taken : undefined) ?? 'field';
 
   const assign = (id: string) => {
+    if (!usable(id)) return;
     playSe('menu');
     const next = { ...slots };
     const cur = Object.keys(next).find((k) => next[k] === id);
@@ -126,9 +125,9 @@ export function Formation({ c, mode, region, seed, inv, onGo, onClose }: { c: Ca
                 <button key={g.id} className={`gen-card ${on ? 'on' : ''}`} disabled={!ok} onClick={() => assign(g.id)}>
                   <img src={tokenUrl(info.portrait)} alt="" width={40} height={40} />
                   <span className="gc-main">
-                    <b>{info.name}</b> <small><KindMark kind={g.kind} size={14} /> {KINDS[g.kind].name}・Lv{g.lv}・兵{g.troops}/{maxTroops(c, g.id)}</small>
+                    <b>{info.name} · {activity(c,g.id)}</b> <small><KindMark kind={g.kind} size={14} /> {KINDS[g.kind].name}・Lv{g.lv}・兵{g.troops}/{maxTroops(c, g.id)}</small>
                     <small>技 {unitSkills(c, g.id, true).map((s) => battleSkill(s).name).join('・')}</small>
-                    {!ok && <small className="bad">{g.injured > 0 ? `傷を癒やしている（あと${g.injured}季節）` : '兵がいない（城下で補充）'}</small>}
+                    {!ok && <small className="bad">{g.injured > 0 ? `傷を癒やしている（あと${g.injured}季節）` : !canAct(c,g.id) ? 'この季節は行動済み' : '兵がいない（城下で補充）'}</small>}
                   </span>
                   {on && <span className="check">{g.id === LORD ? '当主' : '出陣'}</span>}
                 </button>

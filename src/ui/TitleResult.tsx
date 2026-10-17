@@ -1,4 +1,5 @@
 // タイトルと、合戦の結果
+import { loadChronicle, ROUTE_NAME, type LegacyBonus } from '../campaign/strategy';
 import { useState } from 'react';
 import { regionDef, turnLabel } from '../content/sengoku';
 import { LORD } from '../content/generals';
@@ -7,9 +8,12 @@ import { genInfo, lordLv, ownedCount, type Report } from '../campaign/campaign';
 import { bustUrl, tokenUrl } from './common';
 import { Modal, click } from './common';
 
-export function TitleScreen(props: { c: Campaign | null; running: boolean; onContinue: () => void; onNew: () => void; onHelp: () => void; onSettings: () => void }) {
+export function TitleScreen(props: { c: Campaign | null; running: boolean; onContinue: () => void; onNew: (bonus?: LegacyBonus) => void; onHelp: () => void; onSettings: () => void }) {
   const [confirm, setConfirm] = useState(false);
   const c = props.c;
+  const [legacy,setLegacy]=useState(false);
+  const meta=loadChronicle();
+  const launch=()=>meta.points>0?setLegacy(true):props.onNew();
   return (
     <div className="title-screen sengoku">
       <img className="title-bust" src={bustUrl('akatsuki_saku')} alt="" />
@@ -23,20 +27,23 @@ export function TitleScreen(props: { c: Campaign | null; running: boolean; onCon
               つづきから<small>{turnLabel(c.turn)}・{ownedCount(c)}国・朔 Lv{lordLv(c)}{props.running ? '・合戦中' : ''}{c.defeat ? '・落城' : ''}</small>
             </button>
           )}
-          <button className={c ? '' : 'primary'} onClick={click(() => (c ? setConfirm(true) : props.onNew()))}>はじめから<small>暁ノ家の家督相続から</small></button>
+          <button className={c ? '' : 'primary'} onClick={click(() => (c ? setConfirm(true) : launch()))}>はじめから<small>暁ノ家の家督相続から</small></button>
           <div className="title-sub">
             <button onClick={click(props.onHelp)}>遊び方</button>
             <button onClick={click(props.onSettings)}>設定</button>
           </div>
         </div>
-        <p className="credit">v4.1 ・ 八洲十五国を、六対六の合戦で切り取れ</p>
+        {(meta.points>0||Object.keys(meta.endings).length>0)&&<p className="legacy-summary">周回ポイント {meta.points} · {Object.entries(meta.endings).map(([r,n])=>`${ROUTE_NAME[r as keyof typeof ROUTE_NAME]} ${n}回`).join(' / ')}</p>}
+        {Object.keys(meta.read).length>0&&<p className="legacy-summary">既読の物語 {Object.keys(meta.read).length} · 獲得した称号 {Object.keys(meta.titles).length}</p>}
+        <p className="credit">v5.0 ・ 八洲十五国を、六対六の合戦で切り取れ</p>
       </div>
+      {legacy&&<Modal title="周回特典" onClose={()=>setLegacy(false)}><p>ポイント1で特典を一つ選べます。領土と軍団は新たな旅から。</p><div className="row-buttons col">{([['gold','初期資金+1000文'],['retainer','汎用家臣を1名追加'],['training','初期武将のレベル+1']] as [LegacyBonus,string][]).map(([id,n])=><button key={id} onClick={()=>{setLegacy(false);props.onNew(id);}}>{n}</button>)}<button onClick={()=>{setLegacy(false);props.onNew();}}>特典を使わず始める</button></div></Modal>}
       {confirm && (
         <Modal title="はじめから遊びますか？" onClose={() => setConfirm(false)}>
           <p>今の国盗りの記録は消えます。</p>
           <div className="row-buttons">
             <button onClick={() => setConfirm(false)}>やめる</button>
-            <button className="danger" onClick={() => { setConfirm(false); props.onNew(); }}>はじめから</button>
+            <button className="danger" onClick={() => { setConfirm(false); launch(); }}>はじめから</button>
           </div>
         </Modal>
       )}

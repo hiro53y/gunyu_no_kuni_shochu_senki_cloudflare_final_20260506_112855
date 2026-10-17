@@ -1,4 +1,5 @@
 // 武将の一覧と詳しい情報（兵種・兵数・能力・技能・技・絆・交流）、牢の将の説得
+import { activity } from '../campaign/strategy';
 import { useState } from 'react';
 import { FACTIONS } from '../content/sengoku';
 import { GENERALS, GEN_BY_ID, LORD } from '../content/generals';
@@ -36,7 +37,7 @@ export function GeneralsPanel({ c, onChange, onScene, onPersuade, onClose }: { c
                 <button key={id} className="gen-card" onClick={() => { playSe('menu'); setSel(id); }}>
                   <img src={tokenUrl(info.portrait)} alt="" width={42} height={42} />
                   <span className="gc-main">
-                    <b>{info.name}</b> <small><KindMark kind={g.kind} size={14} /> {KINDS[g.kind].name}・Lv{g.lv}・{info.role}</small>
+                    <b>{info.name}</b> <small className="activity">{activity(c,id)}</small><small><KindMark kind={g.kind} size={14} /> {KINDS[g.kind].name}・Lv{g.lv}・{info.role}</small>
                     <span className="troop-bar"><span style={{ width: `${(g.troops / max) * 100}%` }} /></span>
                     <small>兵 {g.troops}/{max}{g.wounded ? `（傷${g.wounded}）` : ''}{id !== LORD && info.unique ? `・絆${'♥'.repeat(g.bond)}${'♡'.repeat(Math.max(0, 2 - g.bond))}` : ''}</small>
                     {g.injured > 0 && <small className="bad">部隊が壊滅し、立て直し中（あと{g.injured}季節）</small>}

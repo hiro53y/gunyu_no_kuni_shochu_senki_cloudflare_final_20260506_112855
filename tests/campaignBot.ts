@@ -48,15 +48,9 @@ export function botParty(c: Campaign, withLord = false) {
   const score = (id: string) => { const p = genPower(c, id); return (p.atk + p.def + p.int + 3) * Math.sqrt(c.gens[id].troops); };
   const others = ready.filter((g) => g.id !== LORD).sort((a, b) => score(b.id) - score(a.id));
   const lord = c.gens[LORD];
-  const useLord = withLord || (others.length < 4 && lord.troops > 0 && lord.injured <= 0);
+  const useLord = withLord || (others.length < 4 && lord.troops > 0 && lord.injured <= 0 && ready.some(g=>g.id===LORD));
   const list = [...(useLord ? [lord] : []), ...others].slice(0, 6);
   const placed = autoPlace(list.map((g) => ({ id: g.id, kind: g.kind })));
-  // 朔は守りやすい後衛へ（空きがあれば）
-  const lp = placed.find((p) => p.gen === LORD);
-  if (lp && lp.row === 0) {
-    const free = ([0, 1, 2] as const).find((s) => !placed.some((p) => p.row === 1 && p.slot === s));
-    if (free !== undefined) { lp.row = 1; lp.slot = free; }
-  }
   return placed;
 }
 

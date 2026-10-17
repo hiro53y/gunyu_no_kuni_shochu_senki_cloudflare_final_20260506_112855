@@ -1,0 +1,2 @@
+// Generated registry; original portraits are unchanged.
+export const UNIQUE_ART = new Set(["akatsuki_saku", "akatsuki_suzuran", "akatsuki_chikage", "akatsuki_genba", "kurogane_genbu", "kurogane_hayato", "kurogane_narukami", "shion_hazuki", "shion_fuuko", "shion_souji", "shirasagi_toshiro", "shirasagi_rin", "shirasagi_shizune", "honoo_kurenai", "honoo_tomoshibi", "rengein_kangetsu", "rengein_tesshin", "youma_kurobuchi", "youma_guren", "youma_gaou", "ronin_kagemaru", "ronin_yuzuriha"]);

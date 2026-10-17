@@ -1,4 +1,6 @@
 // 本陣：八洲の地図・国の情報（領地・国力）・出陣／国の命令／妖魔討伐・交流・城下・武将・季節を進める・攻めてきた敵・捕らえた将
+import { WarCouncil } from './WarCouncil';
+import { canAct, recordEnding } from '../campaign/strategy';
 import { useState } from 'react';
 import { FACTIONS, TERRAIN_NAME, regionDef, turnLabel } from '../content/sengoku';
 import type { Campaign, CommandId, Invasion, Placement, Scene, Settings } from '../campaign/state';
@@ -88,13 +90,14 @@ export function Honjin({ c, settings, onSettings, onChange, onScene, onDepart, o
     <div className={`honjin text-${settings.text}`}>
       <header className="hj-head">
         <div className="hj-turn">{turnLabel(c.turn)}</div>
-        <div className="hj-ap" aria-label={`行動 残り${c.fans}`} title={fame ? `武名${c.fame}（${fame}で行動が増える）` : `武名${c.fame}`}>
+        <div className="hj-ap" aria-label={`行動 残り${c.fans}`} title={fame ? `武名${c.fame}（${fame}で褒賞を選べる）` : `武名${c.fame}`}>
           {Array.from({ length: maxFans(c) }, (_, i) => <span key={i} className={i < c.fans ? 'on' : ''}>扇</span>)}
         </div>
         <div className="hj-gold">{c.gold.toLocaleString()}<small>文</small></div>
         <div className="hj-land">{ownedCount(c)}<small>/15国</small></div>
         <button className="menu-btn" onClick={() => setModal('menu')} aria-label="メニュー">≡</button>
       </header>
+      <WarCouncil c={c} onChange={()=>{ recordEnding(c); onChange(); }} />
       <YashimaMap c={c} selected={sel} onSelect={(id) => { playSe('menu'); setSel(id); }} />
       <div className="hj-news" onClick={() => setModal('news')}>
         {c.news.slice(-2).map((n, i) => <div key={i} className={`msg ${n.c ?? ''}`}>{n.t}</div>)}
@@ -158,7 +161,7 @@ export function Honjin({ c, settings, onSettings, onChange, onScene, onDepart, o
         </section>
       )}
       <nav className="hj-commands">
-        <button onClick={() => { playSe('menu'); setModal('gens'); }}>武将<small>{readyGenerals(c).length}人</small></button>
+        <button onClick={() => { playSe('menu'); setModal('gens'); }}>武将<small>未行動{readyGenerals(c).length}人</small></button>
         <button onClick={() => { playSe('menu'); setModal('town'); }}>城下<small>補充・浪人</small></button>
         <button onClick={() => { playSe('menu'); setModal('news'); }}>記録<small>武名{c.fame}</small></button>
         <button className={`end-turn ${c.fans === 0 ? 'pulse' : ''}`} onClick={() => { playSe('menu'); setModal('end'); }}>季節を<br />進める</button>
@@ -217,6 +220,7 @@ export function Honjin({ c, settings, onSettings, onChange, onScene, onDepart, o
       {modal === 'settings' && <Modal title="設定" onClose={() => setModal('menu')}><SettingsBody settings={settings} onChange={onSettings} /></Modal>}
       {modal === 'end' && (
         <Modal title="季節を進めますか？" onClose={() => setModal(null)}>
+          <p className="reserve">防衛に残せる武将 {Object.values(c.gens).filter(g=>canAct(c,g.id)&&g.troops>0).length}名・兵{Object.values(c.gens).filter(g=>canAct(c,g.id)&&g.troops>0).reduce((n,g)=>n+g.troops,0).toLocaleString()}。攻撃や内政で使った武将は敵の手番でも活動できません。</p>
           {c.fans > 0 && <p>まだ行動が{c.fans}回残っています。</p>}
           <p className="note">収入が入り（{income(c).toLocaleString()}文{upkeepOver ? '・維持費が国力を超えて半分' : ''}）、この季節に戦わなかった部隊の傷ついた兵が戻ります。敵の勢力も動きます。{c.turn + 1 >= 8 && !c.flags.youma ? '不穏な気配がする……' : ''}</p>
           <div className="row-buttons">

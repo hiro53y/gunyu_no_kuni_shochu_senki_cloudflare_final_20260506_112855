@@ -1,4 +1,5 @@
 // できごと（会話）：立ち絵と名札、タップで進む
+import { loadChronicle, sceneKey } from '../campaign/strategy';
 import { useEffect, useState } from 'react';
 import { GEN_BY_ID } from '../content/generals';
 import type { Campaign, Scene } from '../campaign/state';
@@ -7,6 +8,7 @@ import { bustUrl } from './common';
 import { playSe } from '../audio/sound';
 
 export function SceneView({ c, scene, onDone }: { c: Campaign; scene: Scene; onDone: () => void }) {
+  const read=!!loadChronicle().read[sceneKey(scene)];
   const [i, setI] = useState(0);
   useEffect(() => { setI(0); }, [scene]);
   const line = scene.lines[Math.min(i, scene.lines.length - 1)];
@@ -39,7 +41,7 @@ export function SceneView({ c, scene, onDone }: { c: Campaign; scene: Scene; onD
   });
   return (
     <div className={`scene-view mood-${scene.mood ?? 'normal'}`} onClick={next}>
-      {scene.title && <div className="scene-title">{scene.title}</div>}
+      {scene.title && <div className="scene-title">{scene.title}{read?' · 既読':''}</div>}
       {portrait && <img key={portrait} className="scene-bust" src={bustUrl(portrait)} alt="" />}
       <div className={`scene-box ${who ? '' : 'narration'}`}>
         {name && <div className="scene-name">{name}</div>}

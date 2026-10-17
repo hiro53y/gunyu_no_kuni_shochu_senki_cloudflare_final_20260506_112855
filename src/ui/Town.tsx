@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { LORD } from '../content/generals';
 import { KINDS } from '../battle/kinds';
 import type { Campaign } from '../campaign/state';
-import { genInfo, healCost, healNow, hire, hireCost, hireTroops, maxTroops, refillAll, roninList, upkeepOf } from '../campaign/campaign';
+import { expandCapacity, expansionCost, genInfo, healCost, healNow, hire, hireCost, hireTroops, maxTroops, refillAll, roninList, upkeepOf } from '../campaign/campaign';
 import { KindMark, Modal, tokenUrl } from './common';
 import { playSe } from '../audio/sound';
 
@@ -49,6 +49,7 @@ export function TownPanel({ c, onChange, onClose }: { c: Campaign; onChange: () 
                     <small>兵 {g.troops}/{max}{g.wounded ? `・傷 ${g.wounded}` : ''}・維持費{upkeepOf(g)}</small>
                   </span>
                   <span className="town-btns">
+                    <button className="small" disabled={c.gold<expansionCost(c,g.id)||(g.capacityBonus??0)>=8000} onClick={()=>{const e=expandCapacity(c,g.id);done(e??`${info.short}隊の兵数上限を拡張した`);}}>部隊拡張<small>{expansionCost(c,g.id)}文</small></button>
                     <button className="small" disabled={hc <= 0 || c.gold <= 0} onClick={() => { const e = healNow(c, g.id); if (!e) playSe('revive'); done(e ?? `${info.short}隊を手当てした`); }}>手当て<small>{hc > 0 ? `${hc}文` : '―'}</small></button>
                     <button className="small" disabled={ic <= 0 || c.gold <= 0} onClick={() => { const e = hireTroops(c, g.id); if (!e) playSe('coin'); done(e ?? `${info.short}隊を増員した`); }}>増員<small>{ic > 0 ? `${ic}文` : '満'}</small></button>
                   </span>

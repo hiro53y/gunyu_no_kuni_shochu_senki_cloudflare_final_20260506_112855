@@ -1,5 +1,6 @@
-// 合戦のドット絵：2頭身のちび武将（顔は立ち絵から縮めたドット）と、兵種ごとの小さな兵。すべて Canvas で描いてキャッシュする
+// 合戦の全身イラストを Canvas にキャッシュ。読み込み失敗時だけ兵種の簡易絵を使う。
 // 向きは右向き（左の陣）。右の陣は描く時に左右を反転する
+import { UNIQUE_ART } from './artManifest';
 import type { Kind } from '../types';
 
 export type Pose = 'idle0' | 'idle1' | 'run0' | 'run1' | 'atk0' | 'atk1' | 'special' | 'hurt' | 'down';
@@ -293,7 +294,9 @@ function drawSmallRider(faction: string, pose: Pose): HTMLCanvasElement {
 const genCache = new Map<string, GenSprite>();
 const solCache = new Map<string, HTMLCanvasElement>();
 
-export function generalSprite(kind: Kind, faction: string, pose: Pose): GenSprite {
+export function generalSprite(kind: Kind, faction: string, pose: Pose, portrait?:string): GenSprite {
+  const art=illustratedSprite(portrait&&UNIQUE_ART.has(portrait)?portrait:`commander_${kind}`,pose,80);
+  if(art) return {canvas:art,w:80,h:80,headX:0,headY:0,footX:40};
   const key = `${kind}|${faction}|${pose}`;
   let s = genCache.get(key);
   if (!s) { s = drawGeneral(kind, faction, pose === 'down' ? 'idle0' : pose); genCache.set(key, s); }
@@ -301,83 +304,29 @@ export function generalSprite(kind: Kind, faction: string, pose: Pose): GenSprit
 }
 
 export function soldierSprite(kind: Kind, faction: string, pose: Pose): HTMLCanvasElement {
+  const art=illustratedSprite(`soldier_${kind}`,pose,40);
+  if(art)return art;
   const key = `${kind}|${faction}|${pose}`;
   let s = solCache.get(key);
   if (!s) { s = drawSoldier(kind, faction, pose === 'down' ? 'idle0' : pose); solCache.set(key, s); }
   return s;
 }
 
-// ── 顔（立ち絵の丸い顔を縮めてドットにする） ──
-
-const HEAD = 12;
-const headCache = new Map<string, HTMLCanvasElement | 'loading' | 'error'>();
-const waiters = new Set<() => void>();
-
-/** 色の段を減らす（ドット絵らしく） */
-function posterize(v: number): number {
-  return Math.min(255, Math.round(v / 36) * 36 + 10);
+// Each atlas has six full coherent character poses, not separate portrait heads.
+const atlasCache=new Map<string,HTMLImageElement>();
+const poseCache=new Map<string,HTMLCanvasElement>();
+const POSE_INDEX:Record<Pose,number>={idle0:0,idle1:0,run0:1,run1:1,atk0:2,atk1:2,special:5,hurt:3,down:4};
+function illustratedSprite(key:string,pose:Pose,size:number):HTMLCanvasElement|null{
+ let img=atlasCache.get(key);
+ if(!img){img=new Image();img.src=`/assets/v5/${key}.webp?v=20261017-v5`;atlasCache.set(key,img);}
+ if(!img.complete||!img.naturalWidth)return null;
+ const i=POSE_INDEX[pose],cacheKey=`${key}:${i}:${size}`;
+ let cv=poseCache.get(cacheKey);if(cv)return cv;
+ cv=document.createElement('canvas');cv.width=size;cv.height=size;
+ const ctx=cv.getContext('2d')!;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+ ctx.drawImage(img,i%3*256,Math.floor(i/3)*256,256,256,0,0,size,size);poseCache.set(cacheKey,cv);return cv;
 }
-
-function buildHead(img: HTMLImageElement): HTMLCanvasElement {
-  // 顔の中ほどを、まず 24px に、さらに 12px に縮める（色が混ざりすぎないよう2段で）
-  const [mid, mg] = mk(24, 24);
-  mg.imageSmoothingEnabled = true;
-  mg.imageSmoothingQuality = 'high';
-  const s = img.width;
-  mg.drawImage(img, s * 0.16, s * 0.1, s * 0.68, s * 0.68, 0, 0, 24, 24);
-  const [c, g] = mk(HEAD, HEAD);
-  g.imageSmoothingEnabled = true;
-  g.drawImage(mid, 0, 0, 24, 24, 0, 0, HEAD, HEAD);
-  const data = g.getImageData(0, 0, HEAD, HEAD);
-  const R = HEAD / 2 - 0.3;
-  for (let y = 0; y < HEAD; y++) {
-    for (let x = 0; x < HEAD; x++) {
-      const i = (y * HEAD + x) * 4;
-      const d = Math.hypot(x + 0.5 - HEAD / 2, y + 0.5 - HEAD / 2);
-      if (d > R) { data.data[i + 3] = 0; continue; }
-      data.data[i] = posterize(data.data[i]);
-      data.data[i + 1] = posterize(data.data[i + 1]);
-      data.data[i + 2] = posterize(data.data[i + 2]);
-      data.data[i + 3] = 255;
-      if (d > R - 1) { data.data[i] *= 0.45; data.data[i + 1] *= 0.4; data.data[i + 2] *= 0.4; }
-    }
-  }
-  g.putImageData(data, 0, 0);
-  return c;
+export function preloadBattleArt(portraits:{portrait:string;kind:Kind}[]):Promise<void>{
+ const keys=new Set<string>();for(const u of portraits){keys.add(UNIQUE_ART.has(u.portrait)?u.portrait:`commander_${u.kind}`);keys.add(`soldier_${u.kind}`);}
+ return Promise.all([...keys].map(key=>new Promise<void>(resolve=>{let img=atlasCache.get(key);if(img?.complete){resolve();return;}if(!img){img=new Image();atlasCache.set(key,img);}img.addEventListener('load',()=>resolve(),{once:true});img.addEventListener('error',()=>resolve(),{once:true});if(!img.src)img.src=`/assets/v5/${key}.webp?v=20261017-v5`;}))).then(()=>{});
 }
-
-/** ドットの顔（まだ読み込み中なら null。読み込めたら onReady を呼ぶ） */
-export function headSprite(url: string, onReady?: () => void): HTMLCanvasElement | null {
-  const got = headCache.get(url);
-  if (got instanceof HTMLCanvasElement) return got;
-  if (onReady) waiters.add(onReady);
-  if (got === 'loading' || got === 'error') return null;
-  headCache.set(url, 'loading');
-  const img = new Image();
-  img.onload = () => {
-    try { headCache.set(url, buildHead(img)); } catch { headCache.set(url, 'error'); }
-    for (const w of [...waiters]) w();
-    waiters.clear();
-  };
-  img.onerror = () => headCache.set(url, 'error');
-  img.src = url;
-  return null;
-}
-
-/** 顔が読めない時の代わり（兵種の色の丸） */
-export function fallbackHead(color: string): HTMLCanvasElement {
-  const key = `fb|${color}`;
-  const got = headCache.get(key);
-  if (got instanceof HTMLCanvasElement) return got;
-  const [c, g] = mk(HEAD, HEAD);
-  g.fillStyle = OUT;
-  g.beginPath(); g.arc(6, 6, 6, 0, Math.PI * 2); g.fill();
-  g.fillStyle = SKIN;
-  g.beginPath(); g.arc(6, 6, 5, 0, Math.PI * 2); g.fill();
-  r(g, 1, 1, 10, 4, color);
-  p(g, 7, 6, BLACK); p(g, 4, 6, BLACK);
-  headCache.set(key, c);
-  return c;
-}
-
-export const HEAD_SIZE = HEAD;

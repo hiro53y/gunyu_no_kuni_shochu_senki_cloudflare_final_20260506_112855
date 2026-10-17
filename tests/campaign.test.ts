@@ -1,4 +1,5 @@
 // 国盗り：国のデータ・扇と武名・宣戦布告・領地と戦場・合戦の結果（傷ついた兵・捕獲）・牢と説得・国の命令・ターン・敵の手番・城下・保存・通しの自動プレイ
+import { claimReward, strategy } from '../src/campaign/strategy';
 import { describe, expect, it } from 'vitest';
 import { REGIONS, regionDef } from '../src/content/sengoku';
 import { GENERALS, LORD } from '../src/content/generals';
@@ -23,11 +24,14 @@ function endBattle(b: Battle, win: boolean, opt: { mercy?: boolean } = {}): Batt
   return b;
 }
 
+function fixtureSeason(c:Campaign) {c.turn++;strategy(c).enemyTurn=null;c.invasions=[];c.fans=2;}
+
 function atWar(c: Campaign, rid: string) {
   c.factions[c.regions[rid].owner].war = true;
 }
 
 function siege(c: Campaign, rid: string, win: boolean, seed = 5, opt: { mercy?: boolean } = {}): ReturnType<typeof finishBattle> {
+  fixtureSeason(c);
   c.fans = 3;
   atWar(c, rid);
   const b = createBattle(beginBattle(c, 'siege', rid, botParty(c, true), seed));
@@ -39,6 +43,7 @@ function conquer(c: Campaign, rid: string, take = true) {
   for (let i = 0; i < 8 && c.regions[rid].owner !== 'akatsuki'; i++) {
     siege(c, rid, true, 10 + i, { mercy: true });
     if (take) for (const id of [...c.captives]) recruit(c, id);
+    fixtureSeason(c);
     for (const g of Object.values(c.gens)) if (g.status === 'ours') { g.troops = maxTroops(c, g.id); g.injured = 0; }
   }
 }
@@ -64,12 +69,15 @@ describe('国のデータ', () => {
 });
 
 describe('扇と宣戦布告', () => {
-  it('初めの扇は2つ。武名20・60・120で増える', () => {
+  it('初めの扇は2つ。武名の褒賞を選ぶと増える', () => {
     const c = newCampaign(1);
     expect(c.fans).toBe(2);
     c.fame = 20;
+    expect(maxFans(c)).toBe(2);
+    claimReward(c,'fans');
     expect(maxFans(c)).toBe(3);
     c.fame = 120;
+    claimReward(c,'fans'); claimReward(c,'fans');
     expect(maxFans(c)).toBe(5);
   });
 
@@ -83,6 +91,7 @@ describe('扇と宣戦布告', () => {
     const r1 = doCommand(c, 'war', '11', gens);
     if (!r1.done) {
       expect(c.progress['war:11']).toBe(r1.points);
+      fixtureSeason(c);
       const r2 = doCommand(c, 'war', '11', gens);
       expect(r2.done).toBe(true);
     }
@@ -111,6 +120,7 @@ describe('出陣と合戦の結果', () => {
     expect(siege(c, '11', true).kind).toBe('win');
     expect(c.regions['11'].taken).toBe(1);
     for (let i = 1; i < n - 1; i++) siege(c, '11', true, 20 + i);
+    fixtureSeason(c);
     c.fans = 3;
     const b = createBattle(beginBattle(c, 'siege', '11', botParty(c, true), 99));
     expect(b.ground).toBe('castle');
@@ -170,11 +180,12 @@ describe('出陣と合戦の結果', () => {
     const c = newCampaign(7);
     conquer(c, '04');
     expect(c.gens.g_narukami.status).toBe('jail');
+    fixtureSeason(c);
     expect(commandError(c, 'persuade', 'g_narukami', ['g_chikage'])).toBeNull();
     const gens = ['g_chikage', 'g_suzuran', 'g_genba', LORD];
-    const fans = c.fans;
+    const fans = 2;
     let done = false;
-    for (let i = 0; i < 10 && !done; i++) done = doCommand(c, 'persuade', 'g_narukami', gens).done;
+    for (let i = 0; i < 10 && !done; i++) {fixtureSeason(c);done = doCommand(c, 'persuade', 'g_narukami', gens).done;}
     expect(done).toBe(true);
     expect(c.fans).toBe(fans);
     expect(c.gens.g_narukami.status).toBe('ours');
@@ -190,11 +201,12 @@ describe('出陣と合戦の結果', () => {
     expect(c.gens.g_tesshin.status).toBe('ours');
   });
 
-  it('黒淵を討つと結末になる（登用はできない）', () => {
+  it('黒淵を討ったことを記録し、ルートの条件で結末になる（登用はできない）', () => {
     const c = newCampaign(9);
     c.regions['13'].taken = c.regions['13'].lands.length - 1;
     siege(c, '13', true);
-    expect(c.victory).toBe(c.turn);
+    expect(strategy(c).demonDefeated).toBe(true);
+    expect(c.victory).toBeUndefined();
     expect(c.gens.g_kurobuchi.status).toBe('gone');
   });
 
@@ -228,9 +240,11 @@ describe('国の命令', () => {
     const c = newCampaign(11);
     atWar(c, '06');
     c.fans = 5;
-    while (!doCommand(c, 'prepare', '06', ['g_genba', LORD, 'g_suzuran', 'g_chikage']).done) c.fans = 5;
+    while (!doCommand(c, 'prepare', '06', ['g_genba', LORD, 'g_suzuran', 'g_chikage']).done) fixtureSeason(c);
+    fixtureSeason(c);
     c.fans = 5;
-    while (!doCommand(c, 'sabotage', '06', ['g_chikage', 'g_suzuran', LORD, 'g_genba']).done) c.fans = 5;
+    while (!doCommand(c, 'sabotage', '06', ['g_chikage', 'g_suzuran', LORD, 'g_genba']).done) fixtureSeason(c);
+    fixtureSeason(c);
     expect(c.regions['06'].prep).toBeCloseTo(0.07);
     expect(c.regions['06'].sabotage).toBeCloseTo(0.2);
     c.fans = 2;
@@ -268,11 +282,11 @@ describe('ターンと敵の手番', () => {
     expect(half).toBeLessThan(income(c));
   });
 
-  it('攻めてくるのは1ターンに1度まで。おまかせの守りも同じ合戦で決まる', () => {
+  it('同じ勢力が1季節に重複して攻めてこない。おまかせの守りも同じ合戦で決まる', () => {
     const c = newCampaign(14);
     let seen = 0;
     for (let t = 0; t < 40 && !c.defeat; t++) {
-      expect(c.invasions.length).toBeLessThanOrEqual(1);
+      expect(new Set(c.invasions.map(x=>x.faction)).size).toBe(c.invasions.length);
       for (const inv of [...c.invasions]) {
         seen++;
         const { report, battle } = autoDefend(c, inv, t);
@@ -317,6 +331,7 @@ describe('交流・城下', () => {
     const c = newCampaign(17);
     expect(unitSkills(c, 'g_suzuran', true)).not.toContain('kanagi');
     doBond(c, 'g_suzuran');
+    fixtureSeason(c);
     doBond(c, 'g_suzuran');
     expect(unitSkills(c, 'g_suzuran', true)).toContain('kanagi');
     expect(c.fame).toBe(6);
@@ -340,7 +355,7 @@ describe('交流・城下', () => {
     const max = maxTroops(c, LORD);
     conquer(c, '11');
     expect(ownedCount(c)).toBe(2);
-    expect(maxTroops(c, LORD)).toBe(max + 50);
+    expect(maxTroops(c, LORD)).toBe(max + 50 + (c.gens[LORD].capacityBonus ?? 0));
   });
 
   it('陣立ては兵種に合わせて前衛・後衛に分かれる', () => {

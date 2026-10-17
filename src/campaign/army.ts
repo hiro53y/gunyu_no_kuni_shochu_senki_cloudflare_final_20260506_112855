@@ -90,7 +90,7 @@ export function traitsOf(c: Campaign, id: string): Trait[] {
 /** 味方の兵数の上限：（400＋50×国の数）× 兵種の倍率 */
 export function maxTroops(c: Campaign, id: string): number {
   const g = c.gens[id];
-  return Math.round((400 + 50 * ownedCount(c)) * KINDS[g.kind].cap);
+  return Math.round((400 + 50 * ownedCount(c)) * KINDS[g.kind].cap + (g.capacityBonus??0));
 }
 
 /** 敵の兵数（国の強さから） */
@@ -240,7 +240,15 @@ export function siegeArmy(c: Campaign, so: Sortie, seed: number): UnitSpec[] {
   if (final && rs.boss && c.gens[rs.boss]?.status === 'enemy') named.push({ id: rs.boss, boss: true });
   if (rs.mid && c.gens[rs.mid]?.status === 'enemy' && (final || f === n - 2)) named.push({ id: rs.mid });
   const size = Math.max(named.length, Math.min(6, 2 + Math.floor(danger / 6) + (final ? 1 : 0)));
-  return enemyArmy(c, so, seed, rs.owner, danger, size, named, rs.sabotage);
+  const units=enemyArmy(c, so, seed, rs.owner, danger, size, named, rs.sabotage);
+  if(rid==='13'&&final&&c.strategy?.route){
+    for(const u of units){
+      if(c.strategy.route==='seal'&&c.strategy.seals.length>=2){u.atk=Math.max(1,u.atk-2);u.def=Math.max(0,u.def-1);}
+      if(c.strategy.route==='hado'){u.troops=Math.min(u.maxTroops,Math.round(u.troops*1.12));u.apBonus=(u.apBonus??0)+1;}
+      if(c.strategy.route==='pact'){u.spd=Math.max(0,u.spd-1);}
+    }
+  }
+  return units;
 }
 
 /** 攻めてきた軍（大将＋侍大将） */

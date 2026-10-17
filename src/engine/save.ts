@@ -1,14 +1,15 @@
 // 保存：本陣（国盗り）・合戦の途中（毎手）・季節の始めの写し・設定。壊れたデータは読み込まない
+import { initialStrategy } from '../campaign/strategy';
 import { REGIONS } from '../content/sengoku';
 import { KINDS } from '../battle/kinds';
 import { BATTLE_VERSION } from '../battle/engine';
 import type { Battle } from '../battle/types';
 import { CAMPAIGN_VERSION, DEFAULT_SETTINGS, type Campaign, type Settings } from '../campaign/state';
 
-export const KEY_BATTLE = 'gunyu41:battle';
-export const KEY_CAMPAIGN = 'gunyu41:campaign';
-export const KEY_SNAPSHOT = 'gunyu41:turnstart';
-export const KEY_SETTINGS = 'gunyu41:settings';
+export const KEY_BATTLE = 'gunyu5:battle';
+export const KEY_CAMPAIGN = 'gunyu5:campaign';
+export const KEY_SNAPSHOT = 'gunyu5:turnstart';
+export const KEY_SETTINGS = 'gunyu5:settings';
 
 export interface KV {
   getItem(key: string): string | null;
@@ -59,6 +60,7 @@ export function deserializeCampaign(text: string | null): Campaign | null {
     const c = JSON.parse(text) as Campaign;
     if (!validCampaign(c)) return null;
     // 足りない項目は補う（版の中での追加）
+    c.strategy ??= initialStrategy();
     c.scenes ??= [];
     c.invasions ??= [];
     c.captives ??= [];

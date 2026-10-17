@@ -1,5 +1,6 @@
 // 国盗りの進行：行動の扇・武名、出陣（宣戦布告した勢力の領地を1つずつ）・妖魔討伐・国の命令（建設・戦の準備・宣戦布告・人材探索・工作・説得）、
 // 交流、城下（補充・増員・浪人宿）、ターンの終わり（傷ついた兵の回復・収入と維持費）、敵の手番（1ターンに1度の侵攻）、合戦の結果（捕獲の確率）
+import { advanceStory, canAct, currentRound, commandAllowed, initialStrategy, markUsed, onConquest, relation, rosterSize, settleEnemy, strategy } from './strategy';
 import { FACTIONS, FACTION_IDS, FINAL, HOME, REGIONS, regionDef, type FactionId } from '../content/sengoku';
 import { GENERALS, GENERIC_TYPES, GEN_BY_ID, GIVEN_NAMES, LORD, ONI_NAMES, SURNAMES, type GenDef } from '../content/generals';
 import { chance, hashSeed, pick, range, shuffle, type Rng } from '../engine/rng';
@@ -8,7 +9,7 @@ import { createBattle, act, type BattleSpec } from '../battle/engine';
 import { chooseAction } from '../battle/ai';
 import type { Battle, Kind } from '../battle/types';
 import { CAMPAIGN_VERSION, type Campaign, type CommandId, type CustomGen, type GenState, type Invasion, type News, type Placement, type Scene } from './state';
-import { DEFEAT, ENDING, FINAL_CALL, FIRST_WIN, LORD_FALLS, OPENING, SEASON_TALK, UNIFIED, YOUMA_WAKES, factionFallen } from './events';
+import { DEFEAT, FINAL_CALL, FIRST_WIN, LORD_FALLS, OPENING, SEASON_TALK, UNIFIED, YOUMA_WAKES, factionFallen } from './events';
 import {
   autoPlace, baseOf, battleSpec, castleDanger, expFor, healCost, hireCost, huntArmy, invasionArmy, landsOf, lordLv, maxTroops, ownedCount, partyUnits, siegeArmy, traitsOf, upkeepOf,
 } from './army';
@@ -19,7 +20,6 @@ export { castleDanger, expFor, lordLv, maxTroops, ownedCount, healCost, hireCost
 export const MAX_PARTY = 6;
 export const YOUMA_TURN = 8;
 /** 武名で増える扇の境目 */
-export const FAME_STEPS = [20, 60, 120];
 
 // ── 乱数 ──
 
@@ -38,17 +38,15 @@ function news(c: Campaign, t: string, cl?: News['c']) {
 // ── 扇と武名 ──
 
 export function maxFans(c: Campaign): number {
-  return 2 + FAME_STEPS.filter((s) => c.fame >= s).length;
+  return 2 + strategy(c).bonusFans;
 }
 
 export function nextFameStep(c: Campaign): number | null {
-  return FAME_STEPS.find((s) => c.fame < s) ?? null;
+  return (Math.floor(c.fame / 20) + 1) * 20;
 }
 
 function addFame(c: Campaign, n: number) {
-  const before = maxFans(c);
   c.fame += n;
-  if (maxFans(c) > before) news(c, `武名が${c.fame}に高まった。1季節の行動が${maxFans(c)}回に増えた！`, 'good');
 }
 
 // ── 武将の情報 ──
@@ -104,7 +102,7 @@ function startNp(rid: string): number {
 
 export function newCampaign(seed: number): Campaign {
   const c: Campaign = {
-    v: CAMPAIGN_VERSION, seed: seed | 0, rng: hashSeed(seed, 'campaign'), turn: 1, fans: 2, fame: 0, gold: 1500,
+    strategy: initialStrategy(), v: CAMPAIGN_VERSION, seed: seed | 0, rng: hashSeed(seed, 'campaign'), turn: 1, fans: 2, fame: 0, gold: 1500,
     regions: {}, factions: {} as Campaign['factions'], gens: {}, nextGen: 1, progress: {},
     news: [], flags: {}, scenes: [...OPENING], invasions: [], captives: [], sortie: null,
     stats: { battles: 0, wins: 0, losses: 0, kills: 0, captured: 0, hunts: 0, defenses: 0, maxHit: 0 },
@@ -141,7 +139,7 @@ export function isBorder(c: Campaign, rid: string): boolean {
 
 /** 攻められる国（隣で、宣戦布告した勢力） */
 export function canAttack(c: Campaign, rid: string): boolean {
-  return isBorder(c, rid) && c.factions[c.regions[rid].owner].war;
+  return isBorder(c, rid) && relation(c,c.regions[rid].owner)==='war';
 }
 
 /** 家臣（朔を除く） */
@@ -151,7 +149,7 @@ export function ourGenerals(c: Campaign): GenState[] {
 
 /** 合戦に出せる武将（壊滅の傷が無く、兵がいる） */
 export function readyGenerals(c: Campaign): GenState[] {
-  return Object.values(c.gens).filter((g) => g.status === 'ours' && g.injured <= 0 && g.troops > 0);
+  return Object.values(c.gens).filter((g) => canAct(c, g.id) && g.troops > 0);
 }
 
 /** 収入：国ごとの年貢 ×（0.6＋国力×0.08） */
@@ -170,7 +168,9 @@ export function totalUpkeep(c: Campaign): number {
 /** 実際の収入（維持費が国力を超えると半分） */
 export function income(c: Campaign): number {
   const g = grossIncome(c);
-  return totalUpkeep(c) > totalNp(c) ? Math.floor(g / 2) : g;
+  const trade=FACTION_IDS.reduce((n,f)=>n+(c.factions[f].alive&&relation(c,f)==='alliance'?100:0),0);
+  const tribute=Object.values(c.regions).filter(r=>relation(c,r.owner)==='vassal').reduce((n,r)=>n+Math.round(regionDef(r.id).income*.25),0);
+  return (totalUpkeep(c) > totalNp(c) ? Math.floor(g / 2) : g)+trade+tribute;
 }
 
 // ── 出陣 ──
@@ -179,10 +179,12 @@ export function sortieError(c: Campaign, mode: Battle['kind'], rid: string): str
   if (c.defeat) return '戦は終わった';
   if (c.sortie) return '出陣中';
   if (mode === 'defense') return null;
+  if (!commandAllowed(c)) return '敵の手番を先に解決してください';
   if (c.fans <= 0) return 'この季節の行動は残っていない';
   if (mode === 'siege') {
+    if(rid==='13'&&strategy(c).route==='seal'&&c.regions[rid].taken===c.regions[rid].lands.length-1&&strategy(c).seals.length<2)return '鈴音山と焔ノ郷を先に封印してください';
     if (!isBorder(c, rid)) return '隣の国ではない';
-    if (!c.factions[c.regions[rid].owner].war) return '宣戦布告していない';
+    if (relation(c,c.regions[rid].owner)!=='war') return '宣戦布告していない';
   }
   if (mode === 'hunt' && c.regions[rid]?.owner !== 'akatsuki') return '自分の国ではない';
   return null;
@@ -194,7 +196,7 @@ export function checkParty(c: Campaign, party: Placement[]): Placement[] {
   const used = new Set<string>();
   for (const p of party) {
     const g = c.gens[p.gen];
-    if (!g || g.status !== 'ours' || g.injured > 0 || g.troops <= 0) continue;
+    if (!g || g.status !== 'ours' || !canAct(c, p.gen) || g.troops <= 0 || ![0,1].includes(p.row) || ![0,1,2].includes(p.slot)) continue;
     if (ok.some((x) => x.gen === p.gen) || used.has(`${p.row}${p.slot}`)) continue;
     used.add(`${p.row}${p.slot}`);
     ok.push(p);
@@ -224,11 +226,13 @@ export function groundOf(c: Campaign, mode: Battle['kind'], rid: string, land?: 
 export function beginBattle(c: Campaign, mode: Battle['kind'], rid: string, party: Placement[], seed: number, inv?: Invasion): BattleSpec {
   const err = sortieError(c, mode, rid);
   if (err) throw new Error(err);
+  if(mode==='defense'&&(!inv||inv.to!==rid))throw new Error('迎撃する侵攻が違う');
   const placed = checkParty(c, party);
   if (!placed.length) throw new Error('出せる部隊がいない');
   if (mode !== 'defense') c.fans -= 1;
-  const so = { mode, region: rid, party: placed, invasion: inv, land: mode === 'siege' ? c.regions[rid].taken : undefined, temps: {} };
+  const so = { seed:seed|0, mode, region: rid, party: placed, invasion: inv, land: mode === 'siege' ? c.regions[rid].taken : undefined, temps: {} };
   c.sortie = so;
+  markUsed(c, placed.map(p=>p.gen));
   c.stats.battles += 1;
   const L = partyUnits(c, placed);
   let R;
@@ -265,9 +269,12 @@ export function captureChance(hunter: boolean, mercy: boolean): number {
 export function finishBattle(c: Campaign, b: Battle): Report {
   const so = c.sortie;
   if (!so) throw new Error('出陣していない');
+  if (!b.end) throw new Error('合戦はまだ終わっていない');
+  if (so.region !== b.region || so.mode !== b.kind || (so.seed!==undefined&&so.seed!==b.seed)) throw new Error('別の合戦の結果');
   const win = b.end?.winner === 'L';
   const def = regionDef(so.region);
   const rep: Report = { kind: win ? 'win' : 'lose', mode: so.mode, region: so.region, title: '', lines: [], gold: 0, captured: [], killed: [], levelUps: [], lost: 0, gained: 0, fame: 0 };
+  markUsed(c,b.units.filter(u=>!!c.gens[u.gen]).map(u=>u.gen));
   const enemies = b.units.filter((u) => u.side === 'R');
   const enemyStart = enemies.reduce((s, u) => s + u.startTroops, 0);
   const killed = enemies.reduce((s, u) => s + (u.startTroops - u.troops), 0);
@@ -281,8 +288,9 @@ export function finishBattle(c: Campaign, b: Battle): Report {
     rep.lost += lost;
     g.troops = u.troops;
     g.wounded = Math.min(maxTroops(c, u.gen), g.wounded + Math.round(lost * (u.out ? 0.5 : 0.8)));
-    g.fought = c.turn;
+    g.fought = currentRound(c);
     if (win && !u.out) {
+      g.capacityBonus=Math.min(8000,(g.capacityBonus??0)+KINDS[g.kind].gain*3);
       const add = Math.min(KINDS[g.kind].gain * 3, Math.max(0, maxTroops(c, u.gen) - g.troops - g.wounded));
       g.troops += add;
       rep.gained += add;
@@ -316,6 +324,7 @@ export function finishBattle(c: Campaign, b: Battle): Report {
           c.gens[id].troops = Math.round(maxTroops(c, id) * 0.5);
         }
         if (GEN_BY_ID[id]?.never && !c.victory) { /* 黒淵は国を落とした時に討つ */ continue; }
+        markUsed(c,[id]);
         capture(c, id);
         rep.captured.push(id);
         if (extra) mercyUsed = true; else n++;
@@ -373,7 +382,7 @@ export function finishBattle(c: Campaign, b: Battle): Report {
       rep.title = '妖魔の群れを討ち払った！';
       rep.lines.push(`村人からお礼に${bonus}文が届いた。`);
       c.stats.hunts += 1;
-      fame += 1;
+      if(!strategy(c).events[`hunt:${so.region}`]){fame+=1;strategy(c).events[`hunt:${so.region}`]=true;}
     } else rep.title = '妖魔の群れに押し返された……';
   }
   if (fame) { addFame(c, fame); rep.fame = fame; rep.lines.push(`武名 +${fame}（${c.fame}）`); }
@@ -382,6 +391,7 @@ export function finishBattle(c: Campaign, b: Battle): Report {
   const injured = b.units.filter((u) => u.side === 'L' && u.out && u.gen !== LORD).map((u) => baseOf(c, u.gen).short);
   if (injured.length) rep.lines.push(`${injured.join('・')}は部隊が壊滅し、2季節のあいだ出陣できない。`);
   c.sortie = null;
+  settleEnemy(c);
   // 朔の部隊が壊滅した：暁ノ家はおしまい（季節の始めからやり直せる）
   if (b.units.some((u) => u.lord && u.out)) {
     c.defeat = c.turn;
@@ -391,6 +401,7 @@ export function finishBattle(c: Campaign, b: Battle): Report {
   }
   checkFactions(c);
   checkEnd(c);
+  advanceStory(c);
   checkTitles(c);
   return rep;
 }
@@ -416,9 +427,8 @@ function capture(c: Campaign, id: string) {
   }
   if (def?.never) {
     g.status = 'gone';
-    if (id === 'g_kurobuchi' && !c.victory) {
-      c.victory = c.turn;
-      c.scenes.push(...ENDING);
+    if (id === 'g_kurobuchi' && !strategy(c).demonDefeated) {
+      strategy(c).demonDefeated = true;
       news(c, '蛟王黒淵を討ち取った！ 黄泉沼の霧が晴れていく。', 'good');
     }
     return;
@@ -443,7 +453,7 @@ function joinUs(c: Campaign, id: string) {
 
 export function recruit(c: Campaign, id: string): Scene | null {
   const i = c.captives.indexOf(id);
-  if (i < 0) return null;
+  if (i < 0 || rosterSize(c)>=30) return null;
   c.captives.splice(i, 1);
   joinUs(c, id);
   const g = c.gens[id];
@@ -467,6 +477,7 @@ function takeRegion(c: Campaign, rid: string) {
   const r = c.regions[rid];
   const prev = r.owner;
   r.owner = 'akatsuki';
+  onConquest(c,rid,prev);
   r.taken = 0;
   r.prep = 0;
   r.sabotage = 0;
@@ -532,7 +543,7 @@ function checkFactions(c: Campaign) {
     c.invasions = c.invasions.filter((inv) => inv.faction !== f);
     for (const g of Object.values(c.gens)) {
       if (g.faction !== f) continue;
-      if (g.status === 'jail' && !c.captives.includes(g.id)) {
+      if (g.status === 'jail' && !c.captives.includes(g.id) && rosterSize(c)<30) {
         joinUs(c, g.id);
         const info = genInfo(c, g.id);
         c.scenes.push({ title: '帰順', mood: 'victory', lines: [[g.id, info.def?.join || `${info.short}「主家は滅んだ。……これからは、そなたに仕えよう」`], ['', `${info.name}が家臣になった！`]] });
@@ -630,7 +641,7 @@ export function commandKey(cmd: CommandId, target: string): string {
 
 /** 命令に出せる武将（壊滅の傷が無い家臣。合戦に出たかどうかは問わない） */
 export function commandGenerals(c: Campaign): GenState[] {
-  return Object.values(c.gens).filter((g) => g.status === 'ours' && g.injured <= 0);
+  return Object.values(c.gens).filter((g) => canAct(c, g.id));
 }
 
 export function statOf(c: Campaign, id: string, stat: CommandDef['stat']): number {
@@ -644,6 +655,9 @@ export function commandError(c: Campaign, cmd: CommandId, target: string, gens: 
   if (def.fan && c.fans <= 0) return 'この季節の行動は残っていない';
   if (!gens.length) return '武将を選んでください';
   if (gens.length > 5) return '5人まで';
+  if (new Set(gens).size !== gens.length) return '同じ武将は重複できない';
+  if (!commandAllowed(c)) return '敵襲や出陣を先に解決してください';
+  if ((cmd==='search'||cmd==='persuade')&&rosterSize(c)>=30)return '家臣は30名まで';
   if (gens.some((id) => !commandGenerals(c).some((g) => g.id === id))) return '出せない武将がいる';
   switch (cmd) {
     case 'build':
@@ -657,6 +671,7 @@ export function commandError(c: Campaign, cmd: CommandId, target: string, gens: 
     case 'war': {
       const f = c.regions[target]?.owner;
       if (!f || f === 'akatsuki' || !isBorder(c, target)) return '隣の敵の国ではない';
+      if (['alliance','vassal'].includes(relation(c,f)))return '盟約を結んでいる';
       if (c.factions[f].war) return 'すでに戦っている';
       return null;
     }
@@ -684,6 +699,7 @@ export function doCommand(c: Campaign, cmd: CommandId, target: string, gens: str
   if (err) throw new Error(err);
   const def = COMMANDS[cmd];
   if (def.fan) c.fans -= 1;
+  markUsed(c,gens);
   const key = commandKey(cmd, target);
   const need = commandNeed(c, cmd, target);
   const points = gens.reduce((s, id) => s + statOf(c, id, def.stat), 0) + (c.progress[key] ?? 0);
@@ -744,6 +760,7 @@ export function bondError(c: Campaign, id: string): string | null {
   const g = c.gens[id];
   if (!g || g.status !== 'ours' || id === LORD) return '家臣ではない';
   if (c.fans <= 0) return 'この季節の行動は残っていない';
+  if (!commandAllowed(c)||!canAct(c,id)) return '未行動の家臣と交流できる';
   const def = GEN_BY_ID[id];
   if (def && g.bond >= def.bond.length) return 'もう十分に分かり合っている';
   if (!def && g.bond >= 2) return 'もう十分に分かり合っている';
@@ -756,6 +773,7 @@ export function doBond(c: Campaign, id: string): Scene {
   const g = c.gens[id];
   const def = GEN_BY_ID[id];
   c.fans -= 1;
+  markUsed(c,[id]);
   g.exp = Math.max(g.exp, expFor(g.lv + 1));
   g.lv += 1;
   addFame(c, 3);
@@ -763,6 +781,7 @@ export function doBond(c: Campaign, id: string): Scene {
     const ev = def.bond[g.bond];
     g.bond += 1;
     news(c, `${def.short}と語らった。（絆${g.bond}）`, 'good');
+    advanceStory(c);
     const lines = ev.lines.map((l) => [l[0], l[1].replace(/新しい技「(.+?)」を覚えた。/, '固有技「$1」を合戦で使えるようになった。')] as [string, string]);
     return { title: `${def.short} ── ${ev.title}`, lines: [...lines, ['', `${def.short}のレベルが${g.lv}に上がった。`]] };
   }
@@ -845,6 +864,7 @@ export function ensureRonin(c: Campaign) {
 export function hire(c: Campaign, id: string): string | null {
   const g = c.gens[id];
   if (!g || g.status !== 'ronin') return 'もういない';
+  if (rosterSize(c)>=30) return '家臣は30名まで';
   const wage = g.wage ?? wageOf(g);
   if (c.gold < wage) return '文が足りない';
   c.gold -= wage;
@@ -900,8 +920,10 @@ export function endTurn(c: Campaign): TurnReport {
   }
   // 敵の国の取られた領地は、3季節ごとに1つ取り返される
   for (const r of Object.values(c.regions)) if (r.owner !== 'akatsuki' && r.taken > 0 && c.turn % 3 === 0) r.taken -= 1;
+  strategy(c).enemyTurn=c.turn;
   enemyPhase(c);
   c.turn += 1;
+  settleEnemy(c);
   c.fans = maxFans(c);
   ensureRonin(c);
   if (c.turn === YOUMA_TURN && !c.flags.youma) { c.flags.youma = true; c.scenes.push(YOUMA_WAKES); }
@@ -915,16 +937,17 @@ export function endTurn(c: Campaign): TurnReport {
   return { lines: c.news.slice(startNews), invasions: [...c.invasions] };
 }
 
-/** 敵の手番：攻めてくるのは1ターンに1度まで */
+/** 敵の手番：交戦勢力ごとに1季節1度まで */
 function enemyPhase(c: Campaign) {
   if (c.turn < 3) return;
   const found: Invasion[] = [];
   const order = useRng(c, (r) => shuffle(r, FACTION_IDS.filter((f) => f !== 'akatsuki' && c.factions[f].alive)));
+  strategy(c).enemyOrder=order;
   for (const f of order) {
-    if (found.length >= 1) break;
+    if (relation(c,f)==='alliance'||relation(c,f)==='vassal') continue;
     const p = invadeChance(c, f);
     if (p <= 0 || !useRng(c, (r) => chance(r, p))) continue;
-    const targets = ownedRegions(c).filter((r) => regionDef(r.id).adj.some((a) => c.regions[a].owner === f));
+    const targets = Object.values(c.regions).filter(r=>(r.owner==='akatsuki'||['alliance','vassal'].includes(relation(c,r.owner)))&&regionDef(r.id).adj.some(a=>c.regions[a].owner===f));
     if (!targets.length) continue;
     const to = useRng(c, (r) => pick(r, targets));
     const from = regionDef(to.id).adj.filter((a) => c.regions[a].owner === f).sort((a, b) => regionDef(b).danger - regionDef(a).danger)[0];
@@ -936,7 +959,7 @@ function enemyPhase(c: Campaign) {
   }
   // 妖魔は人の国も呑み込む
   if (c.turn >= YOUMA_TURN + 2 && c.factions.youma.alive && useRng(c, (r) => chance(r, Math.min(0.3, 0.1 + (c.turn - YOUMA_TURN) * 0.01)))) {
-    const cand = Object.values(c.regions).filter((r) => r.owner !== 'akatsuki' && r.owner !== 'youma' && regionDef(r.id).adj.some((a) => c.regions[a].owner === 'youma'));
+    const cand = Object.values(c.regions).filter((r) => r.owner !== 'akatsuki' && r.owner !== 'youma' && !['alliance','vassal'].includes(relation(c,r.owner)) && regionDef(r.id).adj.some((a) => c.regions[a].owner === 'youma'));
     if (cand.length) {
       const target = useRng(c, (r) => pick(r, cand));
       const prev = target.owner;
@@ -956,9 +979,11 @@ function enemyPhase(c: Campaign) {
 }
 
 function invadeChance(c: Campaign, f: FactionId): number {
+  if (relation(c,f)!=='war') return 0;
   if (f === 'ronin') return c.factions.ronin.war ? 0.25 : 0;
   if (f === 'youma') return c.turn < YOUMA_TURN ? 0 : Math.min(0.55, 0.25 + (c.turn - YOUMA_TURN) * 0.02);
-  return Math.min(0.55, FACTIONS[f].aggression * (0.6 + c.turn * 0.03) * (c.factions[f].war ? 1.3 : 1));
+  const routeFactor=strategy(c).route==='hado'&&strategy(c).events['mid:hado']?1.3:1;
+  return Math.min(0.55, routeFactor*FACTIONS[f].aggression * (0.6 + c.turn * 0.03) * (c.factions[f].war ? 1.3 : 1));
 }
 
 /** 迎え撃つ合戦の前に、侵攻の一覧から外す */
@@ -980,6 +1005,7 @@ export function autoDefend(c: Campaign, inv: Invasion, seed: number): { report: 
   if (!party.length) {
     loseRegion(c, inv.to, inv.faction, inv.commander);
     checkFactions(c);
+    settleEnemy(c);
     return { report: null, battle: null };
   }
   const spec = beginBattle(c, 'defense', inv.to, party, seed, inv);
@@ -995,3 +1021,13 @@ export function regionLeaders(c: Campaign, rid: string): string[] {
 }
 
 export { traitsOf };
+
+export function expansionCost(c:Campaign,id:string):number {
+ const g=c.gens[id];return Math.round(Math.max(24,KINDS[g.kind].hire)*10*(1+(g.capacityBonus??0)/1000));
+}
+export function expandCapacity(c:Campaign,id:string):string|null {
+ const g=c.gens[id];if(!g||g.status!=='ours'||!commandAllowed(c))return '本陣で家臣の部隊を拡張できる';
+ if((g.capacityBonus??0)>=8000)return '部隊の拡張は最大';
+ const cost=expansionCost(c,id);if(c.gold<cost)return '文が足りない';
+ c.gold-=cost;const n=Math.min(8000-(g.capacityBonus??0),Math.round(100*KINDS[g.kind].cap));g.capacityBonus=(g.capacityBonus??0)+n;g.troops+=n;return null;
+}

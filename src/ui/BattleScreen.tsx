@@ -8,6 +8,7 @@ import { chooseAction } from '../battle/ai';
 import type { Action, BEvent, Battle, Side, SkillDef, Unit } from '../battle/types';
 import type { Settings } from '../campaign/state';
 import { saveBattle } from '../engine/save';
+import { preloadBattleArt } from '../battle/view/sprites';
 import { Field, playEvents } from '../battle/view/field';
 import { KindMark, Modal, bustUrl, tokenUrl } from './common';
 import { playSe } from '../audio/sound';
@@ -61,6 +62,7 @@ export function BattleScreen({ b, title, colors, settings, onSettings, onEnd }: 
   const boxRef = useRef<HTMLDivElement>(null);
   const fieldRef = useRef<Field | null>(null);
   const alive = useRef(true);
+  const actionLock=useRef(false);
   const speed = SPEED[settings.anim ?? 0];
 
   useEffect(() => {
@@ -75,6 +77,7 @@ export function BattleScreen({ b, title, colors, settings, onSettings, onEnd }: 
     if (!cv || !box) return undefined;
     const f = new Field(cv, { colors, headUrl: tokenUrl, bustUrl });
     f.setBattle(b, b.ground);
+    void preloadBattleArt(b.units);
     fieldRef.current = f;
     const resize = () => {
       const r = box.getBoundingClientRect();
@@ -128,12 +131,14 @@ export function BattleScreen({ b, title, colors, settings, onSettings, onEnd }: 
   const unitOfView = useCallback((uid: number) => viewRef.current.units.find((x) => x.uid === uid) ?? null, []);
 
   const doAction = useCallback(async (a: Action) => {
-    if (b.end || busy) return;
+    if (b.end || busy || actionLock.current) return;
+    actionLock.current=true;
     setBusy(true);
     setPickTarget(null);
     setPickSkill(null);
     setPreview(null);
     fieldRef.current?.setTargets([]);
+    try {
     const before = clone(b);
     commitView(before);
     const events = act(b, a);
@@ -144,7 +149,10 @@ export function BattleScreen({ b, title, colors, settings, onSettings, onEnd }: 
     commitView(clone(b));
     f?.sync(b);
     f?.setActive(b.active);
-    setBusy(false);
+    } finally {
+      actionLock.current=false;
+      if(alive.current) setBusy(false);
+    }
   }, [b, busy, apply, unitOfView]);
 
   // 敵の手番・おまかせは自動で進める
@@ -258,7 +266,7 @@ export function BattleScreen({ b, title, colors, settings, onSettings, onEnd }: 
         <span className="bs-name" style={{ color: can.ok ? s.color : undefined }}>{s.name}</span>
         <span className="bs-meta">
           <b className="cost">{Array.from({ length: s.cost === 'all' ? Math.max(1, u!.ap) : Number(s.cost) }, (_, i) => <i key={i} />)}{s.cost === 'all' ? '全' : ''}</b>
-          {RANGE_NAME[s.range]}・硬直{s.prep ? `${s.prep}+準備` : s.stiff}{est ? `・打撃 約${est}` : ''}{s.counter > 0 && target && target.side !== u!.side && KINDS[target.kind].counter ? `・反撃${Math.round(s.counter * 100)}%` : ''}
+          {RANGE_NAME[s.range]}・硬直{s.prep ? `${s.prep}+準備` : s.stiff}{est ? `・打撃目安 ${Math.floor(est*.85)}〜${Math.ceil(est*1.1)}` : ''}{s.counter > 0 && target && target.side !== u!.side && KINDS[target.kind].counter ? `・反撃${Math.round(s.counter * 100)}%` : ''}
         </span>
         <span className="bs-desc">{can.ok ? `${s.desc}${nextSlot >= 0 ? `（次の手番：${nextSlot + 1}番目）` : '（次の手番は先）'}` : can.reason}</span>
       </button>

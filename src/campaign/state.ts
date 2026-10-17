@@ -3,7 +3,7 @@ import type { FactionId } from '../content/sengoku';
 import type { Line } from '../content/generals';
 import type { BattleKind, Ground, Kind } from '../battle/types';
 
-export const CAMPAIGN_VERSION = 3;
+export const CAMPAIGN_VERSION = 4;
 
 export interface RegionState {
   id: string;
@@ -53,6 +53,8 @@ export interface GenState {
   troops: number;
   /** 傷ついた兵（休めば戻る） */
   wounded: number;
+  /** 戦勝と部隊拡張で増えた恒久的な兵数上限 */
+  capacityBonus?: number;
   /** 最後に合戦に出た季節 */
   fought: number;
   custom?: CustomGen;
@@ -61,6 +63,7 @@ export interface GenState {
 }
 
 export interface Scene {
+  key?: string;
   title?: string;
   /** 背景の色合い */
   mood?: 'normal' | 'dark' | 'victory' | 'sad';
@@ -85,6 +88,7 @@ export interface Placement { gen: string; row: 0 | 1; slot: 0 | 1 | 2 }
 
 /** 出陣中の記録（合戦が終わったら本陣に反映する） */
 export interface Sortie {
+  seed?: number;
   mode: BattleKind;
   region: string;
   party: Placement[];
@@ -112,6 +116,7 @@ export interface CampaignStats {
 export type CommandId = 'build' | 'prepare' | 'war' | 'search' | 'sabotage' | 'persuade';
 
 export interface Campaign {
+  strategy?: import('./strategy').Strategy;
   v: number;
   seed: number;
   rng: number;

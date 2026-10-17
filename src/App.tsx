@@ -1,4 +1,6 @@
 // 画面の切り替え：タイトル → 本陣（国盗り） → 合戦（城攻め・迎撃・妖魔討伐） → 結果 → 本陣
+import { loadChronicle, markRead, recordEnding, strategy, spendLegacy, type LegacyBonus } from './campaign/strategy';
+import { qaFixture } from './dev/fixtures';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Campaign, Invasion, Placement, Scene, Settings } from './campaign/state';
 import { abortSortie, beginBattle, finishBattle, newCampaign, type Report } from './campaign/campaign';
@@ -42,10 +44,11 @@ function battleColors(c: Campaign, b: Battle): { L: string; R: string } {
 }
 
 export default function App() {
+  const qa=useMemo(()=>import.meta.env.DEV?qaFixture():null,[]);
   const [settings, setSettingsState] = useState<Settings>(() => loadSettings());
-  const [c, setC] = useState<Campaign | null>(() => loadCampaign());
-  const [battle, setBattle] = useState<Battle | null>(() => loadBattle());
-  const [screen, setScreen] = useState<Screen>('title');
+  const [c, setC] = useState<Campaign | null>(() => qa?.c??loadCampaign());
+  const [battle, setBattle] = useState<Battle | null>(() => qa?.b??loadBattle());
+  const [screen, setScreen] = useState<Screen>(qa?(qa.b?'battle':'honjin'):'title');
   const [report, setReport] = useState<Report | null>(null);
   const [panel, setPanel] = useState<null | 'help' | 'settings'>(null);
   const [, setVersion] = useState(0);
@@ -57,8 +60,9 @@ export default function App() {
   /** 本陣が変わった：保存し、季節が変わっていれば写しも取る */
   const changed = useCallback(() => {
     if (!c) return;
+    recordEnding(c);
     saveCampaign(c);
-    if (c.turn !== snapTurn.current && !c.sortie) {
+    if (c.turn !== snapTurn.current && !c.sortie && !c.invasions.length && strategy(c).enemyTurn===null) {
       snapTurn.current = c.turn;
       saveSnapshot(clone(c));
     }
@@ -80,9 +84,10 @@ export default function App() {
     (window as unknown as { __camp: unknown }).__camp = { get: () => c, battle: () => battle, refresh: () => setVersion((v) => v + 1), save: () => c && saveCampaign(c) };
   }, [c, battle]);
 
-  const startNew = () => {
+  const startNew = (bonus?: LegacyBonus) => {
     const seed = (Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) | 0;
     const next = newCampaign(seed);
+    if(bonus) spendLegacy(next,loadChronicle(),bonus);
     saveBattle(null);
     setBattle(null);
     saveCampaign(next);
@@ -93,11 +98,12 @@ export default function App() {
   };
 
   const endBattle = useCallback((b: Battle) => {
-    if (!c) return;
+    if (!c || !c.sortie) return;
     const rep = finishBattle(c, b);
+    recordEnding(c);
+    saveCampaign(c);
     saveBattle(null);
     setBattle(null);
-    saveCampaign(c);
     setReport(rep);
     setScreen('result');
   }, [c]);
@@ -150,7 +156,7 @@ export default function App() {
   return (
     <>
       {body}
-      {scene && c && <SceneView c={c} scene={scene} onDone={() => { c.scenes.shift(); changed(); }} />}
+      {scene && c && <SceneView c={c} scene={scene} onDone={() => { markRead(scene); c.scenes.shift(); changed(); }} />}
       {!scene && screen === 'honjin' && c?.defeat && (
         <Modal title={c.defeatReason === 'lord' ? '暁、落つ' : '落城'}>
           <p>{c.defeatReason === 'lord' ? '当主・朔の部隊が壊滅し、暁ノ家は瓦解した……' : '本拠の暁原を失い、暁ノ家は滅びた……'}</p>

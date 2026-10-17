@@ -1,7 +1,7 @@
 // 合戦の戦場：ちび武将と兵の集団を左右3段×2列に並べ、出来事に合わせて動かす（Canvas・ドット絵）
 // 低い解像度の「世界」に描いてから整数倍に引き伸ばし、文字（打撃の数字・兵数・技名）は画面の解像度で重ねる
 import type { Anim, BEvent, Battle, Ground, Kind, Side, Unit } from '../types';
-import { fallbackHead, generalSprite, headSprite, shade, soldierSprite, HEAD_SIZE, type Pose } from './sprites';
+import { generalSprite, shade, soldierSprite, type Pose } from './sprites';
 
 export interface FieldOptions {
   /** 勢力の色（左・右） */
@@ -59,6 +59,7 @@ export class Field {
   private wg: G;
   private bg: HTMLCanvasElement | null = null;
   private bgKey = '';
+  private paintedBg=new Map<Ground,HTMLImageElement>();
   private opt: FieldOptions;
   private squads = new Map<number, Squad>();
   private fx: Fx[] = [];
@@ -67,9 +68,10 @@ export class Field {
   private cutin: { img: HTMLImageElement; side: Side; name: string; color: string; t: number; dur: number } | null = null;
   private flashA = 0;
   private shakeA = 0;
+  private pending=new Set<()=>void>();
   private raf = 0;
   private last = 0;
-  private S = 2;
+  private S = 1;
   private W = 180;
   private H = 120;
   private cssW = 360;
@@ -91,10 +93,16 @@ export class Field {
     this.world = document.createElement('canvas');
     this.wg = this.world.getContext('2d')!;
     this.loop = this.loop.bind(this);
+    document.addEventListener('visibilitychange',this.onVisibility);
     this.raf = requestAnimationFrame(this.loop);
   }
 
+  private onVisibility=()=>{if(document.hidden){for(const done of [...this.pending])done();for(const s of this.squads.values()){const tw=s.tween;if(tw){s.x=tw.tx;s.y=tw.ty;s.tween=null;tw.done();}}this.fx=[];}};
+
   destroy() {
+    for(const done of [...this.pending])done();
+    for(const s of this.squads.values()) {const t=s.tween;s.tween=null;t?.done();}
+    document.removeEventListener('visibilitychange',this.onVisibility);
     cancelAnimationFrame(this.raf);
   }
 
@@ -104,7 +112,7 @@ export class Field {
     this.cssW = Math.max(200, cssW);
     this.cssH = Math.max(140, cssH);
     this.dpr = Math.max(1, Math.min(3, dpr));
-    this.S = Math.max(2, Math.round(this.cssW / 200));
+    this.S = 1;
     this.W = Math.ceil(this.cssW / this.S);
     this.H = Math.ceil(this.cssH / this.S);
     this.canvas.width = Math.round(this.cssW * this.dpr);
@@ -194,7 +202,7 @@ export class Field {
 
   // ── 時間 ──
 
-  private ms(n: number) { return n * this.speed; }
+  private ms(n: number) { return document.hidden?0:n * this.speed; }
 
   wait(n: number): Promise<void> {
     const d = this.ms(n);
@@ -245,6 +253,9 @@ export class Field {
     g.imageSmoothingEnabled = false;
     if (!this.bg || this.bgKey !== `${W}x${H}${this.ground}`) { this.bg = this.makeBg(); this.bgKey = `${W}x${H}${this.ground}`; }
     g.drawImage(this.bg, 0, 0);
+    let painting=this.paintedBg.get(this.ground);
+    if(!painting){painting=new Image();painting.src=`/assets/v5/background_${this.ground}.webp?v=20261017-v5`;this.paintedBg.set(this.ground,painting);}
+    if(painting.complete&&painting.naturalWidth){const sc=Math.max(W/painting.naturalWidth,H/painting.naturalHeight),dw=painting.naturalWidth*sc,dh=painting.naturalHeight*sc;g.drawImage(painting,(W-dw)/2,(H-dh)/2,dw,dh);}
     // 部隊（奥から）
     const list = [...this.squads.values()].sort((a, b) => a.y - b.y);
     for (const s of list) this.drawSquad(g, s);
@@ -252,7 +263,7 @@ export class Field {
     // 画面へ
     const m = this.g;
     m.setTransform(1, 0, 0, 1, 0, 0);
-    m.imageSmoothingEnabled = false;
+    m.imageSmoothingEnabled = true;
     const sx = this.shakeA > 0 ? Math.round(rnd(-3, 3) * this.shakeA) : 0;
     const sy = this.shakeA > 0 ? Math.round(rnd(-2, 2) * this.shakeA) : 0;
     m.fillStyle = '#100c0a';
@@ -284,8 +295,8 @@ export class Field {
     g.beginPath(); g.ellipse(x - (flip ? -10 : 10), y, 20, 3, 0, 0, Math.PI * 2); g.fill();
     // 兵（後ろから）
     const pose: Pose = out ? 'idle0' : s.pose === 'special' ? 'atk1' : s.pose;
-    const sol = soldierSprite(s.kind, s.color, pose === 'hurt' ? 'hurt' : pose);
-    const offs = [[-9, -5], [-9, 3], [-16, -6], [-16, 2], [-23, -5], [-23, 3]];
+    const sol = soldierSprite(s.kind, s.color, out ? 'down' : pose);
+    const offs = [[-13,-5],[-13,4],[-24,-7],[-24,2],[-35,-6],[-35,3]];
     const n = s.soldiers;
     for (let i = n - 1; i >= 0; i--) {
       const [ox, oy] = offs[i];
@@ -293,31 +304,27 @@ export class Field {
       const sy = y + oy + (i % 2 && bob ? 0 : bob);
       this.blit(g, sol, sx - Math.floor(sol.width / 2), sy - sol.height, flip, out ? 0.4 : 1);
     }
+    // 勢力の旗（武将と兵の服色に依存せず識別できる）
+    if(!out){g.strokeStyle='#5d4630';g.lineWidth=1;g.beginPath();g.moveTo(x-24,y);g.lineTo(x-24,y-48);g.stroke();g.fillStyle=s.color;g.fillRect(x-24,y-48,8,14);}
     // 武将
-    const sp = generalSprite(s.kind, s.color, out ? 'idle0' : s.pose);
+    const sp = generalSprite(s.kind, s.color, out ? 'down' : s.pose, s.portrait);
     const gx = x - sp.footX * (flip ? -1 : 1) - (flip ? sp.w : 0);
     const gy = y - sp.h + (out ? 6 : bob);
     const alpha = out ? 0.55 : 1;
-    if (out) {
-      // 膝をつく（下半身を隠して低く）
+    if (out && sp.h<60) {
+      // Legacy fallback only
       g.save();
       g.beginPath(); g.rect(gx - 2, gy, sp.w + 4, sp.h - 6); g.clip();
       this.blit(g, sp.canvas, gx, gy, flip, alpha);
       g.restore();
     } else this.blit(g, sp.canvas, gx, gy, flip, alpha);
-    // 顔
-    const head = headSprite(this.opt.headUrl(s.portrait), () => {}) ?? fallbackHead(s.color);
-    const hx = flip ? gx + sp.w - sp.headX - HEAD_SIZE : gx + sp.headX;
-    const hy = gy + sp.headY;
-    g.globalAlpha = alpha;
-    g.drawImage(head, hx, hy);
-    g.globalAlpha = 1;
     if (s.flash > 0) {
       g.globalAlpha = Math.min(1, s.flash / 120) * 0.8;
       g.fillStyle = '#ffffff';
       g.fillRect(gx + 2, gy, sp.w - 4, sp.h);
       g.globalAlpha = 1;
     }
+    const hx=gx+sp.w/2-6,hy=gy,HEAD_SIZE=12;
     // 結界・ガード・付与の印
     if (s.barrier && !out) {
       g.strokeStyle = `rgba(200,170,255,${0.55 + 0.25 * Math.sin(this.time / 160)})`;
@@ -562,7 +569,7 @@ export class Field {
   center(uid: number): [number, number] {
     const s = this.sq(uid);
     if (!s) return [this.W / 2, this.H / 2];
-    return [s.x + (s.side === 'L' ? -4 : 4), s.y - 12];
+    return [s.x + (s.side === 'L' ? -4 : 4), s.y - 32];
   }
 
   setPose(uid: number, pose: Pose, ms = 0) {
@@ -574,10 +581,13 @@ export class Field {
 
   moveTo(uid: number, x: number, y: number, ms: number): Promise<void> {
     const s = this.sq(uid);
-    const d = this.ms(ms);
+    const d = document.hidden?0:this.ms(ms);
     if (!s) return Promise.resolve();
     if (d <= 0) { s.x = x; s.y = y; return Promise.resolve(); }
-    return new Promise((done) => {
+    return new Promise<void>((resolve) => {
+      let finished=false;
+      const done=()=>{if(finished)return;finished=true;this.pending.delete(done);window.clearTimeout(timeout);resolve();};
+      const timeout=window.setTimeout(done,2000);this.pending.add(done);
       s.pose = 'run0';
       s.poseMs = 0;
       s.tween = { fx: s.x, fy: s.y, tx: x, ty: y, t: 0, dur: d, done: () => { s.pose = 'idle0'; done(); } };
@@ -589,7 +599,7 @@ export class Field {
     const s = this.sq(uid), t = this.sq(target);
     if (!s || !t) return Promise.resolve();
     const dir = s.side === 'L' ? -1 : 1;
-    return this.moveTo(uid, t.x + dir * 15, t.y + 1, ms);
+    return this.moveTo(uid, t.x + dir * 38, t.y + 1, ms);
   }
 
   back(uid: number, ms = 220): Promise<void> {
@@ -605,18 +615,18 @@ export class Field {
   screenShake(a = 1) { if (this.speed > 0) this.shakeA = Math.max(this.shakeA, a); }
 
   float(uid: number, text: string, color: string, size = 16, opts: { dy?: number; dur?: number } = {}) {
-    if (this.speed <= 0) return;
+    if (document.hidden || this.speed <= 0) return;
     const [x, y] = this.center(uid);
     this.floats.push({ x: x + rnd(-2, 2), y: y + (opts.dy ?? -6), text, color, size, t: 0, dur: this.ms(opts.dur ?? 900) || 1, rise: 22 });
   }
 
   showBanner(text: string, color: string, side: Side, ms = 900) {
-    if (this.speed <= 0) return;
+    if (document.hidden || this.speed <= 0) return;
     this.banner = { text, color, side, t: 0, dur: this.ms(ms) };
   }
 
   showCutin(portrait: string, side: Side, name: string, color: string, ms = 900): Promise<void> {
-    if (this.speed <= 0) return Promise.resolve();
+    if (document.hidden || this.speed <= 0) return Promise.resolve();
     let img = this.bustCache.get(portrait);
     if (!img) { img = new Image(); img.src = this.opt.bustUrl(portrait); this.bustCache.set(portrait, img); }
     this.cutin = { img, side, name, color, t: 0, dur: this.ms(ms) };
@@ -633,7 +643,7 @@ export class Field {
     const lost = before - s.soldiers;
     if (lost > 0 && this.speed > 0) {
       const flip = s.side === 'R';
-      const offs = [[-9, -5], [-9, 3], [-16, -6], [-16, 2], [-23, -5], [-23, 3]];
+      const offs = [[-13,-5],[-13,4],[-24,-7],[-24,2],[-35,-6],[-35,3]];
       for (let i = s.soldiers; i < before; i++) {
         const [ox, oy] = offs[i];
         this.fx.push(new FallingSoldier(soldierSprite(s.kind, s.color, 'hurt'), s.x + (flip ? -ox : ox), s.y + oy, flip, this.ms(700)));
@@ -661,11 +671,14 @@ export class Field {
 
   /** 飛び道具（着いたら解決） */
   shoot(from: number, to: number, kind: Anim, delay = 0): Promise<void> {
-    if (this.speed <= 0) return Promise.resolve();
+    if (document.hidden || this.speed <= 0) return Promise.resolve();
     const [fx, fy] = this.center(from);
     const [tx, ty] = this.center(to);
     const dur = this.ms(kind === 'gun' ? 160 : kind === 'arrow' ? 300 : kind === 'shuriken' ? 240 : 320);
-    return new Promise((done) => {
+    return new Promise<void>((resolve) => {
+      let finished=false;
+      const done=()=>{if(finished)return;finished=true;this.pending.delete(done);window.clearTimeout(timeout);resolve();};
+      const timeout=window.setTimeout(done,2000);this.pending.add(done);
       const start = () => this.fx.push(new Projectile(kind, fx + (from && this.sq(from)?.side === 'L' ? 8 : -8), fy - 2, tx, ty, dur, () => {
         this.fx.push(new Burst(tx, ty, kind === 'gun' ? '#ffd060' : kind === 'magic' ? '#c090ff' : '#ffffff', kind === 'gun' ? 7 : 5, this.ms(220)));
         done();
@@ -676,7 +689,7 @@ export class Field {
   }
 
   slash(uid: number, color = '#ffffff', big = false) {
-    if (this.speed <= 0) return;
+    if (document.hidden || this.speed <= 0) return;
     const [x, y] = this.center(uid);
     const side = this.sq(uid)?.side ?? 'R';
     this.fx.push(new Slash(x, y, side === 'R' ? 1 : -1, color, big, this.ms(260)));
@@ -685,7 +698,7 @@ export class Field {
 
   /** 矢の雨（敵の側の全体） */
   rain(side: Side, color = '#e8d0a0'): Promise<void> {
-    if (this.speed <= 0) return Promise.resolve();
+    if (document.hidden || this.speed <= 0) return Promise.resolve();
     const list = [...this.squads.values()].filter((s) => s.side === side && !s.out);
     for (let i = 0; i < 28; i++) {
       const s = list[i % Math.max(1, list.length)];
@@ -697,7 +710,7 @@ export class Field {
 
   /** 式神（紙の鳥）の群れ */
   birds(from: number, targets: number[], color: string): Promise<void> {
-    if (this.speed <= 0) return Promise.resolve();
+    if (document.hidden || this.speed <= 0) return Promise.resolve();
     const [fx, fy] = this.center(from);
     for (const t of targets) {
       const [tx, ty] = this.center(t);
@@ -707,7 +720,7 @@ export class Field {
   }
 
   aura(uid: number, color: string, kind: 'heal' | 'buff' | 'guard' | 'shout') {
-    if (this.speed <= 0) return;
+    if (document.hidden || this.speed <= 0) return;
     const [x, y] = this.center(uid);
     if (kind === 'heal') for (let i = 0; i < 10; i++) this.fx.push(new Sparkle(x + rnd(-14, 14), y + rnd(-6, 12), color, this.ms(rnd(400, 800))));
     else if (kind === 'shout') this.fx.push(new Ring(x, y, color, this.ms(420)));
@@ -715,26 +728,26 @@ export class Field {
   }
 
   arrowMark(uid: number, good: boolean, color: string) {
-    if (this.speed <= 0) return;
+    if (document.hidden || this.speed <= 0) return;
     const [x, y] = this.center(uid);
     this.fx.push(new BuffArrow(x + rnd(-6, 6), y - 6, good, color, this.ms(700)));
   }
 
   shield(uid: number) {
-    if (this.speed <= 0) return;
+    if (document.hidden || this.speed <= 0) return;
     const [x, y] = this.center(uid);
     this.fx.push(new Hex(x, y, this.ms(380)));
   }
 
   darkSlash(uid: number) {
-    if (this.speed <= 0) return;
+    if (document.hidden || this.speed <= 0) return;
     const [x, y] = this.center(uid);
     this.fx.push(new Slash(x, y, 1, '#a080ff', true, this.ms(420)));
     this.fx.push(new Slash(x, y, -1, '#6040c0', true, this.ms(420)));
   }
 
   shatter(uid: number) {
-    if (this.speed <= 0) return;
+    if (document.hidden || this.speed <= 0) return;
     const [x, y] = this.center(uid);
     for (let i = 0; i < 12; i++) this.fx.push(new Sparkle(x + rnd(-12, 12), y + rnd(0, 14), '#c090ff', this.ms(rnd(300, 600))));
   }
