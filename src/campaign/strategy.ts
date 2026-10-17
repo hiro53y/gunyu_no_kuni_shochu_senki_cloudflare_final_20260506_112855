@@ -176,4 +176,3 @@ export function restoreAlly(c:Campaign,f:FactionId):string {
 
 export function sceneKey(s:Scene):string{return s.key??`${s.title??'会話'}:${s.lines[0]?.[1]??''}`;}
 export function markRead(s:Scene){const m=loadChronicle();m.read[sceneKey(s)]=true;saveChronicle(m);}
-
