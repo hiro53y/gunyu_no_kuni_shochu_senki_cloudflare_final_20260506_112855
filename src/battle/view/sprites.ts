@@ -6,7 +6,8 @@ import type { Kind } from '../types';
 export type Pose = 'idle0' | 'idle1' | 'run0' | 'run1' | 'atk0' | 'atk1' | 'special' | 'hurt' | 'down';
 
 /** 武将の絵の大きさ（ドット）。顔の位置も返す */
-export interface GenSprite { canvas: HTMLCanvasElement; w: number; h: number; headX: number; headY: number; footX: number }
+export interface Sprite { canvas: HTMLCanvasElement; w: number; h: number }
+export interface GenSprite extends Sprite { headX: number; headY: number; footX: number }
 
 const OUT = '#1a1210';
 const SKIN = '#f2c9a0';
@@ -295,7 +296,7 @@ const genCache = new Map<string, GenSprite>();
 const solCache = new Map<string, HTMLCanvasElement>();
 
 export function generalSprite(kind: Kind, faction: string, pose: Pose, portrait?:string): GenSprite {
-  const art=illustratedSprite(portrait&&UNIQUE_ART.has(portrait)?portrait:`commander_${kind}`,pose,80);
+  const art=illustratedSprite(portrait&&UNIQUE_ART.has(portrait)?portrait:`commander_${kind}`,pose);
   if(art) return {canvas:art,w:80,h:80,headX:0,headY:0,footX:40};
   const key = `${kind}|${faction}|${pose}`;
   let s = genCache.get(key);
@@ -303,28 +304,28 @@ export function generalSprite(kind: Kind, faction: string, pose: Pose, portrait?
   return s;
 }
 
-export function soldierSprite(kind: Kind, faction: string, pose: Pose): HTMLCanvasElement {
-  const art=illustratedSprite(`soldier_${kind}`,pose,40);
-  if(art)return art;
+export function soldierSprite(kind: Kind, faction: string, pose: Pose): Sprite {
+  const art=illustratedSprite(`soldier_${kind}`,pose);
+  if(art)return {canvas:art,w:40,h:40};
   const key = `${kind}|${faction}|${pose}`;
   let s = solCache.get(key);
   if (!s) { s = drawSoldier(kind, faction, pose === 'down' ? 'idle0' : pose); solCache.set(key, s); }
-  return s;
+  return {canvas:s,w:s.width,h:s.height};
 }
 
-// Each atlas has six full coherent character poses, not separate portrait heads.
+// Preserve the native 256px cell. Display dimensions are separate; never pre-shrink to 80/40px.
 const atlasCache=new Map<string,HTMLImageElement>();
 const poseCache=new Map<string,HTMLCanvasElement>();
 const POSE_INDEX:Record<Pose,number>={idle0:0,idle1:0,run0:1,run1:1,atk0:2,atk1:2,special:5,hurt:3,down:4};
-function illustratedSprite(key:string,pose:Pose,size:number):HTMLCanvasElement|null{
+function illustratedSprite(key:string,pose:Pose):HTMLCanvasElement|null{
  let img=atlasCache.get(key);
  if(!img){img=new Image();img.src=`/assets/v5/${key}.webp?v=20261017-v5`;atlasCache.set(key,img);}
  if(!img.complete||!img.naturalWidth)return null;
- const i=POSE_INDEX[pose],cacheKey=`${key}:${i}:${size}`;
+ const i=POSE_INDEX[pose],cacheKey=`${key}:${i}`;
  let cv=poseCache.get(cacheKey);if(cv)return cv;
- cv=document.createElement('canvas');cv.width=size;cv.height=size;
+ cv=document.createElement('canvas');cv.width=256;cv.height=256;
  const ctx=cv.getContext('2d')!;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
- ctx.drawImage(img,i%3*256,Math.floor(i/3)*256,256,256,0,0,size,size);poseCache.set(cacheKey,cv);return cv;
+ ctx.drawImage(img,i%3*256,Math.floor(i/3)*256,256,256,0,0,256,256);poseCache.set(cacheKey,cv);return cv;
 }
 export function preloadBattleArt(portraits:{portrait:string;kind:Kind}[]):Promise<void>{
  const keys=new Set<string>();for(const u of portraits){keys.add(UNIQUE_ART.has(u.portrait)?u.portrait:`commander_${u.kind}`);keys.add(`soldier_${u.kind}`);}

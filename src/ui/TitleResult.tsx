@@ -35,7 +35,7 @@ export function TitleScreen(props: { c: Campaign | null; running: boolean; onCon
         </div>
         {(meta.points>0||Object.keys(meta.endings).length>0)&&<p className="legacy-summary">周回ポイント {meta.points} · {Object.entries(meta.endings).map(([r,n])=>`${ROUTE_NAME[r as keyof typeof ROUTE_NAME]} ${n}回`).join(' / ')}</p>}
         {Object.keys(meta.read).length>0&&<p className="legacy-summary">既読の物語 {Object.keys(meta.read).length} · 獲得した称号 {Object.keys(meta.titles).length}</p>}
-        <p className="credit">v5.0 ・ 八洲十五国を、六対六の合戦で切り取れ</p>
+        <p className="credit">v5.0.1 ・ 八洲十五国を、六対六の合戦で切り取れ</p>
       </div>
       {legacy&&<Modal title="周回特典" onClose={()=>setLegacy(false)}><p>ポイント1で特典を一つ選べます。領土と軍団は新たな旅から。</p><div className="row-buttons col">{([['gold','初期資金+1000文'],['retainer','汎用家臣を1名追加'],['training','初期武将のレベル+1']] as [LegacyBonus,string][]).map(([id,n])=><button key={id} onClick={()=>{setLegacy(false);props.onNew(id);}}>{n}</button>)}<button onClick={()=>{setLegacy(false);props.onNew();}}>特典を使わず始める</button></div></Modal>}
       {confirm && (

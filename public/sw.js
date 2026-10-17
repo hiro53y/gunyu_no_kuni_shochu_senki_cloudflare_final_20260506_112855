@@ -1,10 +1,10 @@
-// 群雄ノ國：掌中戦記 v5.0 Service Worker（国盗り合戦絵巻）
+// 群雄ノ國：掌中戦記 v5.0.1 Service Worker（国盗り合戦絵巻）
 // - APP SHELL は事前キャッシュ
 // - 立ち絵 (/assets/portraits/) は network-first（新規追加が即反映されるため）
 // - その他 GET リクエストは cache-first（バンドルアセット等）
 // - 失敗レスポンス（4xx/5xx）はキャッシュしない
 
-const CACHE_NAME = 'gunyu-no-kuni-v9-emaki-v5';
+const CACHE_NAME = 'gunyu-no-kuni-v10-crisp-battle-v501';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg'];
 
 self.addEventListener('install', (event) => {

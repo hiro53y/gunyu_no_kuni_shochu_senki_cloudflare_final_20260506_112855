@@ -433,3 +433,14 @@ button.primary:disabled { filter: grayscale(0.7) brightness(0.6); }
  .bp-cell{min-height:37px}.bf-who{font-size:.7rem}.bf-who small{font-size:.6rem}.bf-hint{font-size:.65rem}
  .bf-chips .chip{padding:4px;font-size:.7rem}.bf-chips{gap:3px}.bf-tools button{padding:4px}
 }
+
+/* v5.0.1: keep field geometry unchanged while controls are replaced by animation status. */
+.bhead{flex:none}.order{height:36px;min-height:36px;overflow:hidden}
+.bfoot{height:160px;grid-template-rows:minmax(0,1fr) 30px;overflow:hidden}
+.bf-turn{min-height:0;grid-template-rows:24px auto minmax(0,1fr);align-content:start}
+.bf-who{white-space:nowrap;overflow:hidden}.bf-who img{flex:none}
+.bf-chips{min-height:0;overflow-y:auto;align-content:start;align-items:start}
+.bf-wait{display:grid;place-items:center;min-height:0}
+.bf-tools{grid-row:2}
+@media(min-width:600px){.bfoot{height:140px}}
+@media(orientation:landscape) and (max-height:600px) and (min-width:600px){.bfoot{height:auto;grid-template-rows:minmax(0,1fr) 28px}.bf-turn{grid-template-rows:22px auto minmax(0,1fr)}}

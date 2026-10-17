@@ -1,7 +1,6 @@
-// 合戦の戦場：ちび武将と兵の集団を左右3段×2列に並べ、出来事に合わせて動かす（Canvas・ドット絵）
-// 低い解像度の「世界」に描いてから整数倍に引き伸ばし、文字（打撃の数字・兵数・技名）は画面の解像度で重ねる
+// 論理座標と描画ピクセルを分離し、背景・部隊・文字を画面密度で描く。
 import type { Anim, BEvent, Battle, Ground, Kind, Side, Unit } from '../types';
-import { generalSprite, shade, soldierSprite, type Pose } from './sprites';
+import { generalSprite, shade, soldierSprite, type Pose, type Sprite } from './sprites';
 
 export interface FieldOptions {
   /** 勢力の色（左・右） */
@@ -66,8 +65,6 @@ export class Field {
   private floats: Float[] = [];
   private banner: { text: string; color: string; side: Side; t: number; dur: number } | null = null;
   private cutin: { img: HTMLImageElement; side: Side; name: string; color: string; t: number; dur: number } | null = null;
-  private flashA = 0;
-  private shakeA = 0;
   private pending=new Set<()=>void>();
   private raf = 0;
   private last = 0;
@@ -109,16 +106,16 @@ export class Field {
   // ── 配置 ──
 
   resize(cssW: number, cssH: number, dpr: number) {
-    this.cssW = Math.max(200, cssW);
-    this.cssH = Math.max(140, cssH);
-    this.dpr = Math.max(1, Math.min(3, dpr));
+    const width = Math.max(200, cssW), height = Math.max(140, cssH);
+    const density = Math.max(1, Math.min(3, dpr));
+    const pixelW = Math.round(width * density), pixelH = Math.round(height * density);
+    // Setting canvas.width/height clears it. Ignore identical ResizeObserver reports.
+    if (this.cssW === width && this.cssH === height && this.dpr === density && this.canvas.width === pixelW && this.canvas.height === pixelH) return;
+    this.cssW = width; this.cssH = height; this.dpr = density;
     this.S = 1;
-    this.W = Math.ceil(this.cssW / this.S);
-    this.H = Math.ceil(this.cssH / this.S);
-    this.canvas.width = Math.round(this.cssW * this.dpr);
-    this.canvas.height = Math.round(this.cssH * this.dpr);
-    this.world.width = this.W;
-    this.world.height = this.H;
+    this.W = width; this.H = height;
+    this.canvas.width = pixelW; this.canvas.height = pixelH;
+    this.world.width = pixelW; this.world.height = pixelH;
     this.bg = null;
     for (const s of this.squads.values()) {
       const [x, y] = this.home(s.side, this.rowOf(s), this.slotOf(s));
@@ -241,8 +238,6 @@ export class Field {
     this.floats = this.floats.filter((f) => f.t < f.dur);
     if (this.banner) { this.banner.t += dt; if (this.banner.t > this.banner.dur) this.banner = null; }
     if (this.cutin) { this.cutin.t += dt; if (this.cutin.t > this.cutin.dur) this.cutin = null; }
-    this.flashA = Math.max(0, this.flashA - dt / 260);
-    this.shakeA = Math.max(0, this.shakeA - dt / 300);
   }
 
   // ── 描画 ──
@@ -250,7 +245,9 @@ export class Field {
   private draw() {
     const g = this.wg;
     const W = this.W, H = this.H;
-    g.imageSmoothingEnabled = false;
+    g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    g.imageSmoothingEnabled = true;
+    g.imageSmoothingQuality = 'high';
     if (!this.bg || this.bgKey !== `${W}x${H}${this.ground}`) { this.bg = this.makeBg(); this.bgKey = `${W}x${H}${this.ground}`; }
     g.drawImage(this.bg, 0, 0);
     let painting=this.paintedBg.get(this.ground);
@@ -264,17 +261,14 @@ export class Field {
     const m = this.g;
     m.setTransform(1, 0, 0, 1, 0, 0);
     m.imageSmoothingEnabled = true;
-    const sx = this.shakeA > 0 ? Math.round(rnd(-3, 3) * this.shakeA) : 0;
-    const sy = this.shakeA > 0 ? Math.round(rnd(-2, 2) * this.shakeA) : 0;
-    m.fillStyle = '#100c0a';
-    m.fillRect(0, 0, this.canvas.width, this.canvas.height);
-    m.drawImage(this.world, 0, 0, W, H, sx * this.dpr, sy * this.dpr, W * this.S * this.dpr, H * this.S * this.dpr);
+    m.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    // Both canvases have the same backing resolution: no CSS-resolution enlargement.
+    m.drawImage(this.world, 0, 0);
     m.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     this.drawLabels(m);
     this.drawFloats(m);
     this.drawBanner(m);
     this.drawCutin(m);
-    if (this.flashA > 0) { m.fillStyle = `rgba(255,250,235,${this.flashA * 0.75})`; m.fillRect(0, 0, this.cssW, this.cssH); }
   }
 
   private drawSquad(g: G, s: Squad) {
@@ -302,7 +296,7 @@ export class Field {
       const [ox, oy] = offs[i];
       const sx = x + (flip ? -ox : ox);
       const sy = y + oy + (i % 2 && bob ? 0 : bob);
-      this.blit(g, sol, sx - Math.floor(sol.width / 2), sy - sol.height, flip, out ? 0.4 : 1);
+      this.blit(g, sol.canvas, sx - sol.w / 2, sy - sol.h, flip, out ? 0.4 : 1, sol.w, sol.h);
     }
     // 勢力の旗（武将と兵の服色に依存せず識別できる）
     if(!out){g.strokeStyle='#5d4630';g.lineWidth=1;g.beginPath();g.moveTo(x-24,y);g.lineTo(x-24,y-48);g.stroke();g.fillStyle=s.color;g.fillRect(x-24,y-48,8,14);}
@@ -315,14 +309,14 @@ export class Field {
       // Legacy fallback only
       g.save();
       g.beginPath(); g.rect(gx - 2, gy, sp.w + 4, sp.h - 6); g.clip();
-      this.blit(g, sp.canvas, gx, gy, flip, alpha);
+      this.blit(g, sp.canvas, gx, gy, flip, alpha, sp.w, sp.h);
       g.restore();
-    } else this.blit(g, sp.canvas, gx, gy, flip, alpha);
+    } else this.blit(g, sp.canvas, gx, gy, flip, alpha, sp.w, sp.h);
     if (s.flash > 0) {
-      g.globalAlpha = Math.min(1, s.flash / 120) * 0.8;
-      g.fillStyle = '#ffffff';
-      g.fillRect(gx + 2, gy, sp.w - 4, sp.h);
-      g.globalAlpha = 1;
+      // A small hit mark on the target, without whitening a rectangle or the whole field.
+      g.strokeStyle = `rgba(255,207,108,${Math.min(1,s.flash/120)})`;
+      g.lineWidth = 2;
+      g.beginPath(); g.arc(x, y-35, 9, -.8, .8); g.stroke();
     }
     const hx=gx+sp.w/2-6,hy=gy,HEAD_SIZE=12;
     // 結界・ガード・付与の印
@@ -381,15 +375,15 @@ export class Field {
     g.fillRect(x - 10, y - 26, 1, 20); g.fillRect(x + 9, y - 22, 1, 16); g.fillRect(x - 2, y - 30, 1, 22);
   }
 
-  private blit(g: G, img: HTMLCanvasElement, x: number, y: number, flip: boolean, alpha: number) {
+  private blit(g: G, img: HTMLCanvasElement, x: number, y: number, flip: boolean, alpha: number, w: number, h: number) {
     g.globalAlpha = alpha;
     if (flip) {
       g.save();
-      g.translate(x + img.width, y);
+      g.translate(x + w, y);
       g.scale(-1, 1);
-      g.drawImage(img, 0, 0);
+      g.drawImage(img, 0, 0, w, h);
       g.restore();
-    } else g.drawImage(img, x, y);
+    } else g.drawImage(img, x, y, w, h);
     g.globalAlpha = 1;
   }
 
@@ -611,8 +605,6 @@ export class Field {
 
   flash(uid: number, ms = 160) { const s = this.sq(uid); if (s) { s.flash = this.ms(ms) || 1; s.shake = this.ms(ms * 1.4); } }
 
-  screenFlash(a = 1) { if (this.speed > 0) this.flashA = Math.max(this.flashA, a); }
-  screenShake(a = 1) { if (this.speed > 0) this.shakeA = Math.max(this.shakeA, a); }
 
   float(uid: number, text: string, color: string, size = 16, opts: { dy?: number; dur?: number } = {}) {
     if (document.hidden || this.speed <= 0) return;
@@ -863,7 +855,7 @@ class Dust implements Fx {
 
 class FallingSoldier implements Fx {
   private t = 0;
-  constructor(private img: HTMLCanvasElement, private x: number, private y: number, private flip: boolean, private dur: number) {}
+  constructor(private sprite: Sprite, private x: number, private y: number, private flip: boolean, private dur: number) {}
   update(dt: number) { this.t += dt; return this.t < this.dur; }
   draw(g: G) {
     const k = Math.min(1, this.t / (this.dur * 0.35));
@@ -872,7 +864,7 @@ class FallingSoldier implements Fx {
     g.translate(Math.round(this.x), Math.round(this.y));
     g.rotate((this.flip ? 1 : -1) * k * (Math.PI / 2));
     if (this.flip) g.scale(-1, 1);
-    g.drawImage(this.img, -Math.floor(this.img.width / 2), -this.img.height);
+    g.drawImage(this.sprite.canvas, -this.sprite.w / 2, -this.sprite.h, this.sprite.w, this.sprite.h);
     g.restore();
     g.globalAlpha = 1;
   }
@@ -1018,7 +1010,7 @@ export async function playEvents(field: Field, events: BEvent[], hooks: PlayHook
         lastSkill = { uid: e.uid, anim: e.anim, color: e.color };
         const se = SE_OF[e.anim];
         if (e.special && u) {
-          field.screenFlash(0.8);
+          field.aura(e.uid, e.color, 'shout');
           hooks.se('crit');
           await field.showCutin(u.portrait, side, e.name, e.color, 950);
           field.setPose(e.uid, 'special', 600);
@@ -1081,7 +1073,6 @@ export async function playEvents(field: Field, events: BEvent[], hooks: PlayHook
         hooks.apply(e);
         field.flash(e.uid, e.big ? 220 : 160);
         if (e.n > 0) field.float(e.uid, `-${e.n}`, e.big ? '#ffd040' : '#ffffff', e.big ? 22 : 17);
-        if (e.big) field.screenShake(0.8);
         hooks.se(e.big ? 'crit' : 'hit');
         field.setTroops(e.uid, hooks.unit(e.uid)?.troops ?? 0);
         await field.wait(e.big ? 220 : 160);
@@ -1149,7 +1140,6 @@ export async function playEvents(field: Field, events: BEvent[], hooks: PlayHook
         field.darkSlash(e.uid);
         field.float(e.uid, '暗殺！', '#c0a0ff', 20, { dy: -16 });
         hooks.se('crit');
-        field.screenShake(1);
         await field.wait(320);
         break;
       case 'down':
@@ -1157,7 +1147,6 @@ export async function playEvents(field: Field, events: BEvent[], hooks: PlayHook
         field.setOut(e.uid);
         field.float(e.uid, '壊滅', '#ff6a5a', 22, { dy: -18, dur: 1100 });
         hooks.se('death');
-        field.screenShake(0.6);
         await field.wait(380);
         break;
       case 'wait':
