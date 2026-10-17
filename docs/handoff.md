@@ -1,17 +1,11 @@
-# 引継ぎ v5.0.1
+# 引継ぎ v5.1
 
-現在の状態：v5.0.1完了・公開中（2026-10-17）。対象はこのdeliverables内Gitリポジトリ。親フォルダや公開URLを移動・変更しない。
+v5.1の実装・ローカル検証完了（2026-10-17）。既存GitHub main連携のCloudflare Pagesで同じURLへ公開する。仕様はdocs/spec.md、検証はtests/test_checklist.mdと_VERIFY.md。CLAUDE向け文書は変更しない。
 
-仕様の正本は docs/spec.md。画像指示とレジストリは docs/art-v5.md / art-v5-manifest.json。検証結果と未確認事項は tests/test_checklist.md。旧版の手順や保存キーは現行手順として使わない。
+戦闘描画はbattle/view/presentation.tsの11兵種/全技プロフィール、field.tsの演出進行と予算・待機解除に分離。元256pxセル・DPR描画・固定戦場を維持する。戦闘エンジンの計算と乱数は変更していない。元の立ち絵94点とv5素材48点は変更なし。
 
-主要実装：campaign/strategy.ts が活動・外交・褒賞・ルート・周回、campaign.ts が命令/合戦の状態遷移。mapGeometry.ts の国領域をYashimaMapが表示と操作に共用。battle/view/sprites.ts が透過アトラスを読み、field.ts が演出。元の立ち絵94ファイルは変更なし。
+地図のSelectedCountryと開戦Commandが共通のactionGuide/warProgressを使う。Honjinが画面入口を一元管理し、WarCouncilの外交へ選択勢力を渡す。勢力別進捗の変換済み印はflags.warProgressFaction。旧国別進捗は削除しない。保存キー・PWA識別情報・APP HUB登録を維持し、起動時の保存確認・復元画面は設けない。
 
-通常テストは npm test。通し60件を含める場合はPowerShellで `$env:V5_RUNS='20'; npm test`。通しボットは既知seedの複製上で編成候補を比較する検証ソルバーであり、人が遊ぶ難易度の証明ではない。資源・領土・勝利の注入は行わない。シナリオ境界テストは明示した完了合戦fixtureを別に使う。
+`npm test`で155件。`$env:V5_RUNS='20'; npm test`で3ルート各20seedを含む215件。CPUを長く使用するキャンペーン検証と他ファイルの競合によるworker RPCタイムアウトを防ぐため、fileParallelism:falseを設定した。通しボットは複製上で編成候補を比較する検証ソルバーで、人間の難易度評価とは区別する。資源・領土・勝利の注入なし。
 
-開発確認用 `?qa=battle/council/ending` はDEVのみ。製品ビルドにfixtureを含めない。通常保存の確認はqaなしURLで行う。保存確認・復元画面を追加しない。旧キーを消去しない。
-
-実装公開コミットは4877ff0、演出設定の統一は3182295。既存URLのv5.0と53配信ファイルの一致、Cloudflareビルド成功を確認済み。次回は公開版を基準に再現条件を確認する。Pixel 9a実機と人による長時間プレイはPC検証と分けて扱う。サブエージェント：未使用。
-
-今回の不具合：武将を80pxへ縮小→CSSサイズの中間Canvas→DPR拡大という経路でぼやけ、技実行中は操作欄消失で戦場が約55px伸び、全画面の閃光/揺れも重なっていた。68c9c09で元セル保持・中間CanvasもDPR化・フッター固定・全画面効果撤去へ修正。描画回帰6件を追加し、ゲームロジックは変更していない。
-
-68c9c09のCloudflareビルド成功、公開版v5.0.1とJS/CSS/sw.js/manifest/アイコン5ファイルの一致を確認。公開版の技名表示前後も戦場420px・操作欄160pxで一致。実機未確認事項は検証チェックリスト参照。
+開発用 `?qa=effects/battle/council/ending` は製品ビルドに含めない。通常の中断再開確認はqaなしURLで行う。Pixel 9a実機の操作感・発熱・インストール済みPWA更新は未確認。サブエージェント：未使用。

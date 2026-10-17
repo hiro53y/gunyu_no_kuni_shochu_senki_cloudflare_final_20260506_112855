@@ -1,3 +1,4 @@
+import {migrateWarProgress,progressKey} from './warProgress';
 // 国盗りの進行：行動の扇・武名、出陣（宣戦布告した勢力の領地を1つずつ）・妖魔討伐・国の命令（建設・戦の準備・宣戦布告・人材探索・工作・説得）、
 // 交流、城下（補充・増員・浪人宿）、ターンの終わり（傷ついた兵の回復・収入と維持費）、敵の手番（1ターンに1度の侵攻）、合戦の結果（捕獲の確率）
 import { advanceStory, canAct, currentRound, commandAllowed, initialStrategy, markUsed, onConquest, relation, rosterSize, settleEnemy, strategy } from './strategy';
@@ -122,6 +123,7 @@ export function newCampaign(seed: number): Campaign {
   ensureRonin(c);
   c.fans = maxFans(c);
   news(c, '暁ノ家の当主・風間朔が家督を継いだ。', 'info');
+  migrateWarProgress(c);
   return c;
 }
 
@@ -635,8 +637,8 @@ export function commandNeed(c: Campaign, cmd: CommandId, target: string): number
   }
 }
 
-export function commandKey(cmd: CommandId, target: string): string {
-  return `${cmd}:${target}`;
+export function commandKey(cmd: CommandId, target: string, c?:Campaign): string {
+  return c?progressKey(c,cmd,target):`${cmd}:${target}`;
 }
 
 /** 命令に出せる武将（壊滅の傷が無い家臣。合戦に出たかどうかは問わない） */
@@ -700,7 +702,8 @@ export function doCommand(c: Campaign, cmd: CommandId, target: string, gens: str
   const def = COMMANDS[cmd];
   if (def.fan) c.fans -= 1;
   markUsed(c,gens);
-  const key = commandKey(cmd, target);
+  migrateWarProgress(c);
+  const key = commandKey(cmd, target,c);
   const need = commandNeed(c, cmd, target);
   const points = gens.reduce((s, id) => s + statOf(c, id, def.stat), 0) + (c.progress[key] ?? 0);
   if (points < need) {

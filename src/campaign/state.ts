@@ -151,6 +151,6 @@ export interface Campaign {
 }
 
 /** 演出の速さ：0=ふつう、1=速い、2=なし */
-export interface Settings { bgm: number; se: number; fast: boolean; anim: 0 | 1 | 2; text: 's' | 'm' | 'l'; auto: boolean }
+export interface Settings { effects?: 'standard'|'reduced'; guideSeen?: boolean; bgm: number; se: number; fast: boolean; anim: 0 | 1 | 2; text: 's' | 'm' | 'l'; auto: boolean }
 
-export const DEFAULT_SETTINGS: Settings = { bgm: 0.5, se: 0.7, fast: false, anim: 0, text: 'm', auto: false };
+export const DEFAULT_SETTINGS: Settings = { effects: 'standard', guideSeen: false, bgm: 0.5, se: 0.7, fast: false, anim: 0, text: 'm', auto: false };

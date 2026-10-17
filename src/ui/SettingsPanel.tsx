@@ -21,6 +21,7 @@ export function SettingsBody({ settings, onChange }: { settings: Settings; onCha
           {([0, 1, 2] as const).map(anim => <button key={anim} aria-pressed={settings.anim === anim} className={settings.anim === anim ? 'on' : ''} onClick={() => set({ anim })}>{['ふつう', '速い', 'なし'][anim]}</button>)}
         </div>
       </div>
+      <div className="setting-row"><span>演出の量</span><div className="seg">{(['standard','reduced'] as const).map(effects=><button key={effects} aria-pressed={(settings.effects??'standard')===effects} className={(settings.effects??'standard')===effects?'on':''} onClick={()=>set({effects})}>{effects==='standard'?'標準':'控えめ'}</button>)}</div></div>
       <div className="setting-row">
         <span>文字の大きさ</span>
         <div className="seg">

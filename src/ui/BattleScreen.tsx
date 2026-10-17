@@ -91,7 +91,7 @@ export function BattleScreen({ b, title, colors, settings, onSettings, onEnd }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => { if (fieldRef.current) fieldRef.current.speed = speed; }, [speed]);
+  useEffect(() => { if (fieldRef.current) {fieldRef.current.speed = speed;fieldRef.current.reduced=settings.effects==='reduced';} }, [speed,settings.effects]);
 
   const commitView = (v: Battle) => { viewRef.current = v; setView(v); };
 

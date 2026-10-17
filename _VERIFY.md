@@ -1,3 +1,9 @@
+# v5.1 検証（2026-10-17）
+
+215件すべて合格、実行基盤エラー0、終了コード0。3,000戦と3ルート各20seed・4,393戦を含む。型チェックと本番ビルド成功。JS index-ekR90qQM.js / CSS index-D2gQVoQd.css。Service Workerキャッシュ gunyu-no-kuni-v11-conquest-effects-v51。
+
+11兵種の局所演出、2,000連続効果/イベント、勢力単位の開戦準備と旧進捗保持、地図操作の通しを確認。詳細と未確認事項はtests/test_checklist.md。公開の読み戻しは次の記録へ追記する。以下は旧版履歴。
+
 # v5.0.1 公開検証（2026-10-17）
 
 実装コミット68c9c09。Cloudflare Pagesビルド成功。既存URLのv5.0.1、JS index-BfO2syAG.js / CSS index-RCPMwg91.css / sw.js / manifest / icon計5ファイルの配信内容がdistと一致。Service Workerキャッシュは gunyu-no-kuni-v10-crisp-battle-v501。保存キーとPWA識別情報に変更なし。

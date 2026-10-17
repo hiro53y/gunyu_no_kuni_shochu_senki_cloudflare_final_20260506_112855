@@ -98,7 +98,9 @@ const SOUNDS: Record<string, (c: AudioContext) => void> = {
   step: (c) => noise(c, 0.04, 0.025, 'lowpass', 500),
 };
 
+const lastPlayed=new Map<string,number>();
 export function playSe(name: string) {
+  const now=Date.now();if(now-(lastPlayed.get(name)??0)<45)return;lastPlayed.set(name,now);
   const c = audio();
   if (!c) return;
   const fn = SOUNDS[name];

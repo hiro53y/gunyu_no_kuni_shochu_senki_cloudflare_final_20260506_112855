@@ -1,3 +1,4 @@
+import {migrateWarProgress} from '../campaign/warProgress';
 // 保存：本陣（国盗り）・合戦の途中（毎手）・季節の始めの写し・設定。壊れたデータは読み込まない
 import { initialStrategy } from '../campaign/strategy';
 import { REGIONS } from '../content/sengoku';
@@ -68,6 +69,7 @@ export function deserializeCampaign(text: string | null): Campaign | null {
     c.titles ??= {};
     c.news ??= [];
     c.progress ??= {};
+    migrateWarProgress(c);
     return c;
   } catch {
     return null;

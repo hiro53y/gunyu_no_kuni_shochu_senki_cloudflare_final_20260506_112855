@@ -1,22 +1,25 @@
-import { useState } from 'react';
+import { useEffect,useRef,useState } from 'react';
 import type { Campaign } from '../campaign/state';
 import { FACTIONS, FACTION_IDS, REGIONS, type FactionId } from '../content/sengoku';
 import { genInfo } from '../campaign/campaign';
 import { ROUTE_NAME, RELATION_NAME, activity, advanceStory, allies, canAct, claimReward, commandAllowed, decideOccupation, diplomacyError, dismiss, negotiate, performSeal, relation, restoreAlly, rewardCount, routeStatus, sealError, strategy, chooseRoute, type DiplomaticAction } from '../campaign/strategy';
 import { Modal } from './common';
 
-export function WarCouncil({c,onChange}:{c:Campaign;onChange:()=>void}) {
- const [open,setOpen]=useState(false),[tab,setTab]=useState('story'),[f,setF]=useState<FactionId>('rengein');
+export function WarCouncil({c,onChange,section,onSection,initialFaction}:{c:Campaign;onChange:()=>void;section:string|null;onSection:(s:string|null)=>void;initialFaction:FactionId}) {
+ const open=section!==null,tab=section??'story';const setTab=(s:string)=>onSection(s);
+ const [f,setF]=useState<FactionId>(initialFaction);
+ useEffect(()=>{setF(initialFaction);setSelected([]);setMessage('');},[initialFaction,section]);
  const [selected,setSelected]=useState<string[]>([]),[message,setMessage]=useState('');
  const [trainee,setTrainee]=useState('g_saku');
  const s=strategy(c),allowed=commandAllowed(c);
  const candidates=Object.values(c.gens).filter(g=>g.status==='ours');
  const team=selected.filter(id=>canAct(c,id));
- const run=(fn:()=>unknown)=>{try{const r=fn();setMessage(typeof r==='string'?r:'軍議の決定を記録しました。');advanceStory(c);onChange();}catch(e){setMessage(e instanceof Error?e.message:String(e));}};
+ const lastDecision=useRef(0);
+ const run=(fn:()=>unknown)=>{const now=Date.now();if(now-lastDecision.current<250)return;lastDecision.current=now;try{const r=fn();setMessage(typeof r==='string'?r:'軍議の決定を記録しました。');advanceStory(c);onChange();}catch(e){setMessage(e instanceof Error?e.message:String(e));}};
  const pending=Object.entries(s.choices).filter(([k,v])=>k.startsWith('occupation:')&&v==='pending');
  return <>
- <button className="council-open" onClick={()=>setOpen(true)}>軍議 · {s.route?ROUTE_NAME[s.route]:'進む道を選ぶ'}<small>外交・褒賞{rewardCount(c)>0?` ${rewardCount(c)}件`:''}・物語</small></button>
- {open&&<Modal title="軍議 ── 八洲の行方" onClose={()=>setOpen(false)} wide>
+ <button className="council-open" onClick={()=>onSection('story')}>軍議 · {s.route?ROUTE_NAME[s.route]:'進む道を選ぶ'}<small>外交・褒賞{rewardCount(c)>0?` ${rewardCount(c)}件`:''}・物語</small></button>
+ {open&&<Modal title="軍議 ── 八洲の行方" onClose={()=>onSection(null)} wide>
  <div className="tabs seg">{[['story','方針と物語'],['diplomacy','外交'],['army','人員と褒賞']].map(([id,n])=><button key={id} className={tab===id?'on':''} onClick={()=>setTab(id)}>{n}</button>)}</div>
  {!allowed&&<p className="note">敵襲または出陣を解決してから決定できます。</p>}
  {message&&<p role="status" className="council-message">{message}</p>}

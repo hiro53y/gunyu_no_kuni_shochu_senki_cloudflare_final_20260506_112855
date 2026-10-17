@@ -90,7 +90,7 @@ describe('扇と宣戦布告', () => {
     const gens = ['g_chikage', 'g_suzuran'];
     const r1 = doCommand(c, 'war', '11', gens);
     if (!r1.done) {
-      expect(c.progress['war:11']).toBe(r1.points);
+      expect(c.progress['war:faction:rengein']).toBe(r1.points);
       fixtureSeason(c);
       const r2 = doCommand(c, 'war', '11', gens);
       expect(r2.done).toBe(true);

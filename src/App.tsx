@@ -1,3 +1,4 @@
+import {EffectShowcase} from './dev/EffectShowcase';
 // 画面の切り替え：タイトル → 本陣（国盗り） → 合戦（城攻め・迎撃・妖魔討伐） → 結果 → 本陣
 import { loadChronicle, markRead, recordEnding, strategy, spendLegacy, type LegacyBonus } from './campaign/strategy';
 import { qaFixture } from './dev/fixtures';
@@ -139,7 +140,7 @@ export default function App() {
   const scene = c && screen === 'honjin' && c.scenes.length ? c.scenes[0] : null;
 
   let body: React.ReactNode;
-  if (screen === 'battle' && battle && c) {
+  if(import.meta.env.DEV&&new URLSearchParams(location.search).get('qa')==='effects'){body=<EffectShowcase/>;} else if (screen === 'battle' && battle && c) {
     body = <BattleScreen key={battle.seed} b={battle} title={battleTitle(c, battle)} colors={battleColors(c, battle)} settings={settings} onSettings={setSettings} onEnd={() => endBattle(battle)} />;
   } else if (screen === 'result' && report && c) {
     body = <ResultScreen c={c} rep={report} onBack={() => { setReport(null); setScreen('honjin'); changed(); }} />;

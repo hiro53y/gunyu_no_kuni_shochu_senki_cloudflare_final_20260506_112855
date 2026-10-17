@@ -1,3 +1,4 @@
+import {TechniqueFx,presentation,motionAt,type Style} from './presentation';
 // 論理座標と描画ピクセルを分離し、背景・部隊・文字を画面密度で描く。
 import type { Anim, BEvent, Battle, Ground, Kind, Side, Unit } from '../types';
 import { generalSprite, shade, soldierSprite, type Pose, type Sprite } from './sprites';
@@ -40,6 +41,7 @@ interface Squad {
 }
 
 interface Fx {
+  cost?:number;
   /** 残りの時間を進め、まだ続くなら true */
   update(dt: number): boolean;
   draw(g: CanvasRenderingContext2D): void;
@@ -81,7 +83,17 @@ export class Field {
   private time = 0;
   private bustCache = new Map<string, HTMLImageElement>();
   /** 演出の速さ（1=ふつう、0.5=速い、0=なし） */
-  speed = 1;
+  private _speed=1;
+  private destroyed=false;
+  reduced=false;
+  private motions=new Map<number,{style:Style;t:number;dur:number}>();
+  get speed(){return this._speed;}
+  set speed(v:number){this._speed=v;if(v<=0)this.finishAnimations();}
+  get effectLimit(){return this.reduced?40:this.cssW<900?160:320;}
+  get activeEffectCost(){return this.fx.reduce((n,f)=>n+(f.cost??1),0);}
+  private addFx(...items:Fx[]){let added=0;for(const f of items){if(this.destroyed||document.hidden||this.speed<=0)break;if(this.activeEffectCost+(f.cost??1)>this.effectLimit)continue;this.fx.push(f);added++;}return added;}
+  private finishAnimations(){for(const done of [...this.pending])done();for(const s of this.squads.values()){const tw=s.tween;s.tween=null;if(tw){s.x=tw.tx;s.y=tw.ty;tw.done();}}this.fx=[];this.floats=[];this.banner=null;this.cutin=null;this.motions.clear();for(const s of this.squads.values()){s.x=s.hx;s.y=s.hy;s.pose='idle0';s.flash=0;s.shake=0;}}
+
 
   constructor(canvas: HTMLCanvasElement, opt: FieldOptions) {
     this.canvas = canvas;
@@ -94,14 +106,8 @@ export class Field {
     this.raf = requestAnimationFrame(this.loop);
   }
 
-  private onVisibility=()=>{if(document.hidden){for(const done of [...this.pending])done();for(const s of this.squads.values()){const tw=s.tween;if(tw){s.x=tw.tx;s.y=tw.ty;s.tween=null;tw.done();}}this.fx=[];}};
-
-  destroy() {
-    for(const done of [...this.pending])done();
-    for(const s of this.squads.values()) {const t=s.tween;s.tween=null;t?.done();}
-    document.removeEventListener('visibilitychange',this.onVisibility);
-    cancelAnimationFrame(this.raf);
-  }
+  private onVisibility=()=>{if(document.hidden)this.finishAnimations();};
+  destroy(){this.destroyed=true;this.finishAnimations();document.removeEventListener('visibilitychange',this.onVisibility);cancelAnimationFrame(this.raf);}
 
   // ── 配置 ──
 
@@ -159,6 +165,7 @@ export class Field {
       const s = this.squads.get(u.uid);
       if (!s) continue;
       this.syncUnit(s, u);
+      if(!s.tween){s.x=s.hx;s.y=s.hy;}
     }
   }
 
@@ -199,12 +206,12 @@ export class Field {
 
   // ── 時間 ──
 
-  private ms(n: number) { return document.hidden?0:n * this.speed; }
+  private ms(n: number) { return document.hidden||this.destroyed?0:n * this.speed; }
 
   wait(n: number): Promise<void> {
     const d = this.ms(n);
     if (d <= 0) return Promise.resolve();
-    return new Promise((res) => window.setTimeout(res, d));
+    return new Promise<void>(resolve=>{const done=()=>{this.pending.delete(done);window.clearTimeout(timer);resolve();};const timer=window.setTimeout(done,d);this.pending.add(done);});
   }
 
   private loop(now: number) {
@@ -217,6 +224,8 @@ export class Field {
   }
 
   private update(dt: number) {
+    for(const [id,m] of this.motions){m.t+=dt;if(m.t>=m.dur)this.motions.delete(id);}
+    while(this.activeEffectCost>this.effectLimit)this.fx.pop();
     for (const s of this.squads.values()) {
       s.bob += dt;
       if (s.poseMs > 0) { s.poseMs -= dt; if (s.poseMs <= 0) s.pose = 'idle0'; }
@@ -276,8 +285,10 @@ export class Field {
     const out = s.out;
     const shake = s.shake > 0 ? Math.round(Math.sin(s.shake / 18) * 1.5) : 0;
     const bob = !out && !s.tween && (s.pose === 'idle0' || s.pose === 'idle1') ? (Math.floor(s.bob / 420) % 2) : 0;
+    const motion=this.motions.get(s.uid),phase=motion?motion.t/motion.dur:0;
+    const movement=motion?motionAt(motion.style,phase):{lift:0,tilt:0,step:0};
     const x = Math.round(s.x) + shake;
-    const y = Math.round(s.y);
+    const y = Math.round(s.y+movement.lift);
     // 手番・標的の印（足元）
     if (!out && this.active === s.uid) {
       g.fillStyle = `rgba(255,214,90,${0.35 + 0.25 * Math.sin(this.time / 120)})`;
@@ -288,13 +299,13 @@ export class Field {
     g.fillStyle = 'rgba(0,0,0,0.28)';
     g.beginPath(); g.ellipse(x - (flip ? -10 : 10), y, 20, 3, 0, 0, Math.PI * 2); g.fill();
     // 兵（後ろから）
-    const pose: Pose = out ? 'idle0' : s.pose === 'special' ? 'atk1' : s.pose;
+    const pose: Pose = out ? 'idle0' : motion?(phase<.3?'run0':phase<.8?'atk1':'idle0'):s.pose === 'special' ? 'atk1' : s.pose;
     const sol = soldierSprite(s.kind, s.color, out ? 'down' : pose);
     const offs = [[-13,-5],[-13,4],[-24,-7],[-24,2],[-35,-6],[-35,3]];
     const n = s.soldiers;
     for (let i = n - 1; i >= 0; i--) {
       const [ox, oy] = offs[i];
-      const sx = x + (flip ? -ox : ox);
+      const sx = x + (flip ? -ox : ox) + (motion?Math.sin(phase*9-i*.7)*movement.step:0);
       const sy = y + oy + (i % 2 && bob ? 0 : bob);
       this.blit(g, sol.canvas, sx - sol.w / 2, sy - sol.h, flip, out ? 0.4 : 1, sol.w, sol.h);
     }
@@ -305,6 +316,7 @@ export class Field {
     const gx = x - sp.footX * (flip ? -1 : 1) - (flip ? sp.w : 0);
     const gy = y - sp.h + (out ? 6 : bob);
     const alpha = out ? 0.55 : 1;
+    g.save();g.translate(x,y);g.rotate((flip?-1:1)*movement.tilt);g.translate(-x,-y);
     if (out && sp.h<60) {
       // Legacy fallback only
       g.save();
@@ -312,6 +324,7 @@ export class Field {
       this.blit(g, sp.canvas, gx, gy, flip, alpha, sp.w, sp.h);
       g.restore();
     } else this.blit(g, sp.canvas, gx, gy, flip, alpha, sp.w, sp.h);
+    g.restore();
     if (s.flash > 0) {
       // A small hit mark on the target, without whitening a rectangle or the whole field.
       g.strokeStyle = `rgba(255,207,108,${Math.min(1,s.flash/120)})`;
@@ -578,6 +591,7 @@ export class Field {
     const d = document.hidden?0:this.ms(ms);
     if (!s) return Promise.resolve();
     if (d <= 0) { s.x = x; s.y = y; return Promise.resolve(); }
+    s.tween?.done();
     return new Promise<void>((resolve) => {
       let finished=false;
       const done=()=>{if(finished)return;finished=true;this.pending.delete(done);window.clearTimeout(timeout);resolve();};
@@ -638,7 +652,7 @@ export class Field {
       const offs = [[-13,-5],[-13,4],[-24,-7],[-24,2],[-35,-6],[-35,3]];
       for (let i = s.soldiers; i < before; i++) {
         const [ox, oy] = offs[i];
-        this.fx.push(new FallingSoldier(soldierSprite(s.kind, s.color, 'hurt'), s.x + (flip ? -ox : ox), s.y + oy, flip, this.ms(700)));
+        this.addFx(new FallingSoldier(soldierSprite(s.kind, s.color, 'hurt'), s.x + (flip ? -ox : ox), s.y + oy, flip, this.ms(700)));
       }
     }
   }
@@ -671,12 +685,12 @@ export class Field {
       let finished=false;
       const done=()=>{if(finished)return;finished=true;this.pending.delete(done);window.clearTimeout(timeout);resolve();};
       const timeout=window.setTimeout(done,2000);this.pending.add(done);
-      const start = () => this.fx.push(new Projectile(kind, fx + (from && this.sq(from)?.side === 'L' ? 8 : -8), fy - 2, tx, ty, dur, () => {
-        this.fx.push(new Burst(tx, ty, kind === 'gun' ? '#ffd060' : kind === 'magic' ? '#c090ff' : '#ffffff', kind === 'gun' ? 7 : 5, this.ms(220)));
+      const start = () => {const added=this.addFx(new Projectile(kind, fx + (from && this.sq(from)?.side === 'L' ? 8 : -8), fy - 2, tx, ty, dur, () => {
+        this.addFx(new Burst(tx, ty, kind === 'gun' ? '#ffd060' : kind === 'magic' ? '#c090ff' : '#ffffff', kind === 'gun' ? 7 : 5, this.ms(220)));
         done();
-      }));
-      if (delay > 0) window.setTimeout(start, this.ms(delay)); else start();
-      if (kind === 'gun') this.fx.push(new Burst(fx + (this.sq(from)?.side === 'L' ? 12 : -12), fy - 2, '#fff0a0', 4, this.ms(140)));
+      }));if(!added)done();};
+      if (delay > 0) void this.wait(delay).then(()=>{if(this.destroyed||document.hidden||this.speed<=0)done();else start();}); else start();
+      if (kind === 'gun') this.addFx(new Burst(fx + (this.sq(from)?.side === 'L' ? 12 : -12), fy - 2, '#fff0a0', 4, this.ms(140)));
     });
   }
 
@@ -684,8 +698,8 @@ export class Field {
     if (document.hidden || this.speed <= 0) return;
     const [x, y] = this.center(uid);
     const side = this.sq(uid)?.side ?? 'R';
-    this.fx.push(new Slash(x, y, side === 'R' ? 1 : -1, color, big, this.ms(260)));
-    this.fx.push(new Dust(x, y + 12, this.ms(500)));
+    this.addFx(new Slash(x, y, side === 'R' ? 1 : -1, color, big, this.ms(260)));
+    this.addFx(new Dust(x, y + 12, this.ms(500)));
   }
 
   /** 矢の雨（敵の側の全体） */
@@ -695,7 +709,7 @@ export class Field {
     for (let i = 0; i < 28; i++) {
       const s = list[i % Math.max(1, list.length)];
       if (!s) break;
-      this.fx.push(new FallingArrow(s.x + rnd(-24, 24) * (side === 'L' ? 1 : -1), s.y - rnd(0, 10), this.ms(rnd(200, 520)), color));
+      this.addFx(new FallingArrow(s.x + rnd(-24, 24) * (side === 'L' ? 1 : -1), s.y - rnd(0, 10), this.ms(rnd(200, 520)), color));
     }
     return this.wait(560);
   }
@@ -706,7 +720,7 @@ export class Field {
     const [fx, fy] = this.center(from);
     for (const t of targets) {
       const [tx, ty] = this.center(t);
-      for (let i = 0; i < 4; i++) this.fx.push(new Bird(fx, fy - 6, tx + rnd(-6, 6), ty + rnd(-6, 4), this.ms(380 + i * 70), color));
+      for (let i = 0; i < 4; i++) this.addFx(new Bird(fx, fy - 6, tx + rnd(-6, 6), ty + rnd(-6, 4), this.ms(380 + i * 70), color));
     }
     return this.wait(460);
   }
@@ -714,35 +728,58 @@ export class Field {
   aura(uid: number, color: string, kind: 'heal' | 'buff' | 'guard' | 'shout') {
     if (document.hidden || this.speed <= 0) return;
     const [x, y] = this.center(uid);
-    if (kind === 'heal') for (let i = 0; i < 10; i++) this.fx.push(new Sparkle(x + rnd(-14, 14), y + rnd(-6, 12), color, this.ms(rnd(400, 800))));
-    else if (kind === 'shout') this.fx.push(new Ring(x, y, color, this.ms(420)));
-    else this.fx.push(new Ring(x, y + 8, color, this.ms(360)));
+    if (kind === 'heal') for (let i = 0; i < 10; i++) this.addFx(new Sparkle(x + rnd(-14, 14), y + rnd(-6, 12), color, this.ms(rnd(400, 800))));
+    else if (kind === 'shout') this.addFx(new Ring(x, y, color, this.ms(420)));
+    else this.addFx(new Ring(x, y + 8, color, this.ms(360)));
   }
 
   arrowMark(uid: number, good: boolean, color: string) {
     if (document.hidden || this.speed <= 0) return;
     const [x, y] = this.center(uid);
-    this.fx.push(new BuffArrow(x + rnd(-6, 6), y - 6, good, color, this.ms(700)));
+    this.addFx(new BuffArrow(x + rnd(-6, 6), y - 6, good, color, this.ms(700)));
   }
 
   shield(uid: number) {
     if (document.hidden || this.speed <= 0) return;
     const [x, y] = this.center(uid);
-    this.fx.push(new Hex(x, y, this.ms(380)));
+    this.addFx(new Hex(x, y, this.ms(380)));
   }
 
   darkSlash(uid: number) {
     if (document.hidden || this.speed <= 0) return;
     const [x, y] = this.center(uid);
-    this.fx.push(new Slash(x, y, 1, '#a080ff', true, this.ms(420)));
-    this.fx.push(new Slash(x, y, -1, '#6040c0', true, this.ms(420)));
+    this.addFx(new Slash(x, y, 1, '#a080ff', true, this.ms(420)));
+    this.addFx(new Slash(x, y, -1, '#6040c0', true, this.ms(420)));
   }
 
   shatter(uid: number) {
     if (document.hidden || this.speed <= 0) return;
     const [x, y] = this.center(uid);
-    for (let i = 0; i < 12; i++) this.fx.push(new Sparkle(x + rnd(-12, 12), y + rnd(0, 14), '#c090ff', this.ms(rnd(300, 600))));
+    for (let i = 0; i < 12; i++) this.addFx(new Sparkle(x + rnd(-12, 12), y + rnd(0, 14), '#c090ff', this.ms(rnd(300, 600))));
   }
+
+  async performTechnique(e:Extract<BEvent,{k:'skill'}>,u:Unit|null,foes:number[],se:()=>void){
+    const actor=this.sq(e.uid);if(!actor||this.speed<=0||document.hidden||this.destroyed)return;
+    const p=presentation(e.skill,actor.kind,e.anim),targets=foes.length?foes:e.targets.length?e.targets:[e.uid];
+    if(e.special&&u)await this.showCutin(u.portrait,u.side,e.name,e.color,650);
+    else this.showBanner(e.name,e.color,actor.side,520);
+    this.setPose(e.uid,'atk0',140);await this.wait(70);
+    if(this.destroyed||document.hidden||this.speed<=0)return;
+    const melee=!p.ranged&&!p.support&&foes.length>0;
+    if(melee){const [tx,ty]=this.center(foes[0]),dir=actor.side==='L'?-1:1;await this.moveTo(e.uid,tx+dir*(actor.kind==='ashigaru'?58:actor.kind==='shinobi'?24:38),ty+32,actor.kind==='kiba'?160:actor.kind==='shinobi'?65:120);}
+    if(this.destroyed||document.hidden||this.speed<=0)return;
+    const duration=this.ms(e.special?500:350);
+    this.motions.set(e.uid,{style:p.style,t:0,dur:Math.max(1,duration)});
+    this.setPose(e.uid,e.special?'special':'atk1',duration);se();
+    const from=this.center(e.uid);
+    for(const id of targets){const to=this.center(id);this.addFx(new TechniqueFx(p.style,from,to,e.color,Math.max(1,duration),p.motif,e.special,this.reduced));}
+    if(e.anim==='guard')this.shield(e.uid);
+    await this.wait(e.special?420:260);
+    if(melee)await this.back(e.uid,100);
+    this.setPose(e.uid,'idle0');
+  }
+
+  interrupt(from:number,target:number){this.addFx(new TechniqueFx('ninja',this.center(from),this.center(target),'#d4a9ff',this.ms(280),2,false,this.reduced));this.float(from,'妨害','#e6c9ff',12,{dy:-38});}
 
   /** 守りの足軽が割って入る */
   async cover(guardUid: number, coveredUid: number) {
@@ -1009,58 +1046,8 @@ export async function playEvents(field: Field, events: BEvent[], hooks: PlayHook
         const side = u?.side ?? 'L';
         lastSkill = { uid: e.uid, anim: e.anim, color: e.color };
         const se = SE_OF[e.anim];
-        if (e.special && u) {
-          field.aura(e.uid, e.color, 'shout');
-          hooks.se('crit');
-          await field.showCutin(u.portrait, side, e.name, e.color, 950);
-          field.setPose(e.uid, 'special', 600);
-        } else field.showBanner(e.name, e.color, side, 820);
-        const foes = e.targets.filter((t) => hooks.unit(t)?.side !== side);
-        switch (e.anim) {
-          case 'melee':
-          case 'spear':
-          case 'charge':
-          case 'claw':
-            if (foes.length) {
-              await field.charge(e.uid, foes[0], e.anim === 'charge' ? 230 : 280);
-              away = e.uid;
-              field.setPose(e.uid, 'atk0', 90);
-              await field.wait(90);
-              field.setPose(e.uid, 'atk1', 260);
-              if (se) hooks.se(se);
-              for (const t of foes) field.slash(t, e.color, e.special);
-              await field.wait(90);
-            }
-            break;
-          case 'arrow':
-          case 'gun':
-          case 'shuriken':
-          case 'magic':
-            field.setPose(e.uid, 'atk0', 140);
-            await field.wait(110);
-            field.setPose(e.uid, 'atk1', 300);
-            if (se) hooks.se(se);
-            if (foes.length) {
-              const shots = foes.map((t, k) => field.shoot(e.uid, t, e.anim, k * 60));
-              await Promise.race(shots);
-            }
-            break;
-          case 'volley':
-            field.setPose(e.uid, 'atk1', 500);
-            if (se) hooks.se(se);
-            await field.rain(side === 'L' ? 'R' : 'L', e.color);
-            break;
-          case 'shiki':
-            field.setPose(e.uid, 'atk1', 500);
-            if (se) hooks.se(se);
-            await field.birds(e.uid, foes, e.color);
-            break;
-          default:
-            field.setPose(e.uid, 'atk0', 360);
-            if (se) hooks.se(se);
-            field.aura(e.uid, e.color, e.anim === 'heal' ? 'heal' : e.anim === 'guard' ? 'guard' : e.anim === 'shout' ? 'shout' : 'buff');
-            await field.wait(220);
-        }
+        const foes=e.targets.filter(t=>hooks.unit(t)?.side!==side);
+        await field.performTechnique(e,u,foes,()=>{if(se)hooks.se(se);});
         break;
       }
       case 'hit': {
@@ -1075,17 +1062,21 @@ export async function playEvents(field: Field, events: BEvent[], hooks: PlayHook
         if (e.n > 0) field.float(e.uid, `-${e.n}`, e.big ? '#ffd040' : '#ffffff', e.big ? 22 : 17);
         hooks.se(e.big ? 'crit' : 'hit');
         field.setTroops(e.uid, hooks.unit(e.uid)?.troops ?? 0);
-        await field.wait(e.big ? 220 : 160);
+        await field.wait(70);
         if (covered !== undefined && covered !== e.uid) field.back(e.uid, 180);
         break;
       }
       case 'counter':
+        await field.charge(e.from,e.uid,70);
         hooks.apply(e);
+        field.slash(e.uid,'#f9ae64');
+        field.float(e.from,'反撃','#ffd18a',14,{dy:-36});
         field.flash(e.uid, 140);
         field.float(e.uid, `-${e.n}`, '#ff9a6a', 13, { dy: -2 });
         hooks.se('hurt');
         field.setTroops(e.uid, hooks.unit(e.uid)?.troops ?? 0);
         await field.wait(150);
+        await field.back(e.from,80);
         break;
       case 'heal':
         hooks.apply(e);
@@ -1114,6 +1105,7 @@ export async function playEvents(field: Field, events: BEvent[], hooks: PlayHook
         await field.wait(380);
         break;
       case 'cancel':
+        if(lastSkill)field.interrupt(lastSkill.uid,e.uid);
         hooks.apply(e);
         field.setFlags(e.uid, { prep: false });
         field.shatter(e.uid);
@@ -1133,7 +1125,7 @@ export async function playEvents(field: Field, events: BEvent[], hooks: PlayHook
         hooks.apply(e);
         field.float(e.uid, '失敗', '#c0b0a0', 13);
         hooks.se('miss');
-        await field.wait(180);
+        await field.wait(100);
         break;
       case 'kill':
         hooks.apply(e);
@@ -1145,6 +1137,7 @@ export async function playEvents(field: Field, events: BEvent[], hooks: PlayHook
       case 'down':
         hooks.apply(e);
         field.setOut(e.uid);
+        field.shatter(e.uid);
         field.float(e.uid, '壊滅', '#ff6a5a', 22, { dy: -18, dur: 1100 });
         hooks.se('death');
         await field.wait(380);
@@ -1160,6 +1153,7 @@ export async function playEvents(field: Field, events: BEvent[], hooks: PlayHook
         hooks.apply(e);
         break;
       case 'end':
+        field.showBanner(e.winner==='L'?'勝鬨 ― 暁の旗を掲げよ':'撤退 ― 次の戦に備えよ',e.winner==='L'?'#ffe1a1':'#b9c8e0',e.winner,800);
         await comeBack();
         hooks.apply(e);
         field.setActive(null);

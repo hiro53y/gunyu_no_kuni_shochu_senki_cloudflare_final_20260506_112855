@@ -1,14 +1,17 @@
+import {SelectedCountry} from './SelectedCountry';
+import {nextObjective,reserve} from '../campaign/actionGuide';
+import {rewardCount} from '../campaign/strategy';
+import type {FactionId} from '../content/sengoku';
 // 本陣：八洲の地図・国の情報（領地・国力）・出陣／国の命令／妖魔討伐・交流・城下・武将・季節を進める・攻めてきた敵・捕らえた将
 import { WarCouncil } from './WarCouncil';
 import { canAct, recordEnding } from '../campaign/strategy';
 import { useState } from 'react';
-import { FACTIONS, TERRAIN_NAME, regionDef, turnLabel } from '../content/sengoku';
+import { FACTIONS,  regionDef, turnLabel } from '../content/sengoku';
 import type { Campaign, CommandId, Invasion, Placement, Scene, Settings } from '../campaign/state';
 import {
-  COMMANDS, LAND_NAME, TITLES, autoDefend, canAttack, castleDanger, commandKey, commandNeed, endTurn, genInfo, grossIncome, income, isBorder, lordLv, maxFans, nextFameStep, ownedCount,
-  readyGenerals, recruit, regionLeaders, release, takeInvasion, totalNp, totalUpkeep, type Report,
+  TITLES, autoDefend,  endTurn, genInfo, grossIncome, income,  lordLv, maxFans, nextFameStep, ownedCount,
+  recruit,  release, takeInvasion, totalNp, totalUpkeep, type Report,
 } from '../campaign/campaign';
-import { GROUND_NAME } from '../battle/engine';
 import type { BattleKind } from '../battle/types';
 import { KINDS } from '../battle/kinds';
 import { bustUrl, tokenUrl } from './common';
@@ -37,29 +40,15 @@ export interface HonjinProps {
 
 const newSeed = () => (Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) | 0;
 
-/** 領地の強さの目安（味方の兵と比べて） */
-function threat(c: Campaign, rid: string): { label: string; cls: string } {
-  const r = c.regions[rid];
-  const d = castleDanger(c, rid) + Math.floor(r.taken / 2);
-  const ours = readyGenerals(c).sort((a, b) => b.troops - a.troops).slice(0, 6).reduce((s, g) => s + g.troops, 0);
-  const size = Math.min(6, 2 + Math.floor(d / 6) + (r.taken >= r.lands.length - 1 ? 1 : 0));
-  const theirs = (280 + d * 32) * size * (1 + d / 40) * (1 - r.sabotage) * (r.lands[r.taken] === 'castle' ? 1.4 : r.lands[r.taken] === 'town' ? 1.15 : 1);
-  const k = ours / Math.max(1, theirs);
-  if (k >= 1.4) return { label: '楽', cls: 'easy' };
-  if (k >= 0.95) return { label: '互角', cls: 'even' };
-  if (k >= 0.65) return { label: '手強い', cls: 'hard' };
-  return { label: '危険', cls: 'deadly' };
-}
-
 export function Honjin({ c, settings, onSettings, onChange, onScene, onDepart, onReport, onTitle }: HonjinProps) {
+  const [council,setCouncil]=useState<string|null>(null);
+  const [diplomaticTarget,setDiplomaticTarget]=useState<FactionId>('rengein');
+  const [decision,setDecision]=useState('');
   const [sel, setSel] = useState<string | null>('01');
   const [modal, setModal] = useState<null | 'gens' | 'town' | 'news' | 'menu' | 'help' | 'settings' | 'titles' | 'end'>(null);
   const [form, setForm] = useState<{ mode: BattleKind; region: string; inv?: Invasion; seed: number } | null>(null);
   const [cmd, setCmd] = useState<{ id: CommandId; target: string } | null>(null);
   const [toast, setToast] = useState('');
-  const r = sel ? regionDef(sel) : null;
-  const rs = sel ? c.regions[sel] : null;
-  const ours = rs?.owner === 'akatsuki';
   const flash = (t: string) => { setToast(t); window.setTimeout(() => setToast(''), 2600); };
 
   const doEndTurn = () => {
@@ -76,16 +65,11 @@ export function Honjin({ c, settings, onSettings, onChange, onScene, onDepart, o
   const fame = nextFameStep(c);
   const upkeepOver = totalUpkeep(c) > totalNp(c);
 
-  const cmdButton = (id: CommandId, target: string, label?: string) => {
-    const key = c.progress[commandKey(id, target)];
-    const need = commandNeed(c, id, target);
-    return (
-      <button key={id} disabled={COMMANDS[id].fan && c.fans <= 0} onClick={() => { playSe('menu'); setCmd({ id, target }); }}>
-        {label ?? COMMANDS[id].name}<small>{key ? `${key}/${need}` : COMMANDS[id].stat === 'cmd' ? '統率' : COMMANDS[id].stat === 'pow' ? '武力' : '知略'}</small>
-      </button>
-    );
-  };
-
+  const remaining=reserve(c);
+  const urgent=!!inv||!!captive;
+  const openCouncil=(tab:string,f?:FactionId)=>{setModal(null);setCmd(null);setForm(null);if(f)setDiplomaticTarget(f);setCouncil(tab);};
+  const openCommand=(id:CommandId,target:string)=>{setCouncil(null);setModal(null);setDecision('');setCmd({id,target});};
+  const openForm=(mode:BattleKind,region:string)=>{setCouncil(null);setModal(null);setDecision('');setForm({mode,region,seed:newSeed()});};
   return (
     <div className={`honjin text-${settings.text}`}>
       <header className="hj-head">
@@ -97,74 +81,22 @@ export function Honjin({ c, settings, onSettings, onChange, onScene, onDepart, o
         <div className="hj-land">{ownedCount(c)}<small>/15国</small></div>
         <button className="menu-btn" onClick={() => setModal('menu')} aria-label="メニュー">≡</button>
       </header>
-      <WarCouncil c={c} onChange={()=>{ recordEnding(c); onChange(); }} />
-      <YashimaMap c={c} selected={sel} onSelect={(id) => { playSe('menu'); setSel(id); }} />
-      <div className="hj-news" onClick={() => setModal('news')}>
-        {c.news.slice(-2).map((n, i) => <div key={i} className={`msg ${n.c ?? ''}`}>{n.t}</div>)}
-      </div>
-      {r && rs && (
-        <section className="region-panel">
-          <div className="rp-head">
-            <span className="rp-mon" style={{ background: FACTIONS[rs.owner].color }}>{FACTIONS[rs.owner].mon}</span>
-            <div>
-              <b className="rp-name">{r.name}</b><small>（{r.reading}）{TERRAIN_NAME[r.terrain]}・{r.product}</small>
-              <div className="rp-owner">{FACTIONS[rs.owner].name}{r.capital ? '・本拠' : ''}{!ours && rs.owner !== 'akatsuki' ? (c.factions[rs.owner].war ? '・交戦中' : '・不戦') : ''}</div>
-            </div>
-          </div>
-          {!ours && <div className="rp-lands" aria-label="領地">
-            {rs.lands.map((g, i) => (
-              <span key={i} className={`land l-${g} ${!ours && i < rs.taken ? 'taken' : ''} ${!ours && i === rs.taken ? 'next' : ''}`} title={GROUND_NAME[g]}>{LAND_NAME[g]}</span>
-            ))}
-            <small>国力 {rs.np}</small>
-          </div>}
-          {ours ? (
-            <>
-              <p className="rp-stats">国力 {rs.np}・収入 {Math.round(r.income * (0.6 + rs.np * 0.08))}文/季・守る時は{r.id === '01' ? '城' : '町'}の戦い</p>
-              <div className="row-buttons wrap">
-                {cmdButton('build', r.id)}
-                {cmdButton('search', r.id)}
-                <button disabled={c.fans <= 0} onClick={() => { playSe('menu'); setForm({ mode: 'hunt', region: r.id, seed: newSeed() }); }}>妖魔討伐<small>経験と文</small></button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="rp-leaders">
-                {regionLeaders(c, r.id).map((id) => {
-                  const info = genInfo(c, id);
-                  return (
-                    <div key={id} className="rp-leader">
-                      <img src={tokenUrl(info.portrait)} alt="" width={36} height={36} />
-                      <span><b>{info.short}</b><small>{id === rs.boss ? '城主' : '城の守り'}・{KINDS[c.gens[id].kind].name}・Lv{c.gens[id].lv}</small></span>
-                    </div>
-                  );
-                })}
-              </div>
-              <p className="rp-stats">
-                次は {GROUND_NAME[rs.lands[rs.taken]]}（{rs.taken + 1}/{rs.lands.length}）・強さ{castleDanger(c, r.id)}　<span className={`threat ${threat(c, r.id).cls}`}>{threat(c, r.id).label}</span>
-                {rs.prep > 0 && <span className="tag good">準備+{Math.round(rs.prep * 100)}%</span>}
-                {rs.sabotage > 0 && <span className="tag good">工作−{Math.round(rs.sabotage * 100)}%</span>}
-              </p>
-              <p className="rp-desc">兵種：{FACTIONS[rs.owner].troops.map(([k]) => KINDS[k].name).join('・')}{rs.taken + 1 >= rs.lands.length ? '　次は城（城主が出る）' : ''}</p>
-              {isBorder(c, r.id) ? (
-                <div className="row-buttons wrap">
-                  {c.factions[rs.owner].war ? (
-                    <button className="primary" disabled={!canAttack(c, r.id) || c.fans <= 0} onClick={() => { playSe('menu'); setForm({ mode: 'siege', region: r.id, seed: newSeed() }); }}>
-                      攻める<small>{c.fans <= 0 ? '扇が残っていない' : '扇1'}</small>
-                    </button>
-                  ) : cmdButton('war', r.id)}
-                  {cmdButton('prepare', r.id)}
-                  {cmdButton('sabotage', r.id)}
-                </div>
-              ) : <p className="note">自分の国の隣ではない。</p>}
-            </>
-          )}
-        </section>
-      )}
+      <div className="strategy-resources"><span>行動 <b>{c.fans}/{maxFans(c)}</b></span><span>未行動 <b>{remaining.count}人</b></span><span>防衛兵力 <b>{remaining.troops.toLocaleString()}</b></span></div>
+      <button className="strategy-objective" onClick={()=>openCouncil('story')}><small>今の目標</small>{nextObjective(c)}<span>軍議 ›</span></button>
+      <div className="strategy-alerts">{inv&&<span className="bad">敵襲 {c.invasions.length}件 · {regionDef(inv.to).name}を守れ</span>}{captive&&<span>捕らえた将 {c.captives.length}人</span>}{rewardCount(c)>0&&<button onClick={()=>openCouncil('army')}>受け取れる褒賞 {rewardCount(c)}件 ›</button>}</div>
+      {!settings.guideSeen&&<aside className="conquest-guide"><b>国取りの流れ</b><p>国を選ぶ → 知略で開戦準備 → 宣戦布告 → 陣立て・出陣。武将は1季節1回。防衛に残す仲間も考えよう。</p><button onClick={()=>onSettings({...settings,guideSeen:true})}>わかった・案内を閉じる</button></aside>}
+      <div className="next-choices"><small>次にできること</small>{c.fans<1||remaining.count===0?<button onClick={()=>{setCouncil(null);setModal('end');}}>季節を進めて活動を回復 ›</button>:<><button onClick={()=>{setSel(Object.values(c.regions).find(r=>r.owner==='akatsuki')?.id??'01');setDecision('人材探索で家臣を増やすと、攻撃と防衛の分担がしやすくなります。');}}>自領で戦力を整える ›</button><button onClick={()=>{const r=Object.values(c.regions).find(r=>r.owner!=='akatsuki'&&regionDef(r.id).adj.some(id=>c.regions[id].owner==='akatsuki'));if(r){setSel(r.id);setDecision('関係と開戦準備を確認し、使う武将を選びましょう。');}}}>隣国の状況を見る ›</button></>}</div>
+      <main className="conquest-layout">
+      <YashimaMap c={c} selected={sel} onSelect={id=>{playSe('menu');setSel(id);setDecision('');}}/>
+      {sel&&<SelectedCountry key={sel} c={c} rid={sel} notice={decision} onSelect={rid=>{setSel(rid);setDecision('');}} onCommand={id=>openCommand(id,sel)} onAttack={()=>openForm('siege',sel)} onHunt={()=>openForm('hunt',sel)} onDiplomacy={()=>openCouncil('diplomacy',c.regions[sel].owner)}/>}
+      </main>
+      {!urgent&&<WarCouncil c={c} section={council} onSection={setCouncil} initialFaction={diplomaticTarget} onChange={()=>{recordEnding(c);onChange();}}/>}
       <nav className="hj-commands">
-        <button onClick={() => { playSe('menu'); setModal('gens'); }}>武将<small>未行動{readyGenerals(c).length}人</small></button>
-        <button onClick={() => { playSe('menu'); setModal('town'); }}>城下<small>補充・浪人</small></button>
-        <button onClick={() => { playSe('menu'); setModal('news'); }}>記録<small>武名{c.fame}</small></button>
-        <button className={`end-turn ${c.fans === 0 ? 'pulse' : ''}`} onClick={() => { playSe('menu'); setModal('end'); }}>季節を<br />進める</button>
+        <button onClick={()=>{setCouncil(null);setModal(null);setCmd(null);}}>地図<small>国を選ぶ</small></button>
+        <button onClick={()=>{setCouncil(null);setModal('gens');}}>軍団<small>武将と活動</small></button>
+        <button onClick={()=>{setCouncil(null);setModal('town');}}>城下<small>補充・浪人</small></button>
+        <button onClick={()=>openCouncil('story')}>軍議<small>外交・褒賞</small></button>
+        <button className="end-turn" onClick={()=>{setCouncil(null);setModal('end');}}>季節を<small>進める</small></button>
       </nav>
       {toast && <div className="toast">{toast}</div>}
 
@@ -179,46 +111,48 @@ export function Honjin({ c, settings, onSettings, onChange, onScene, onDepart, o
           onGo={(party) => { const f = form; setForm(null); if (f.inv) takeInvasion(c, f.inv); onDepart(f.mode, f.region, party, f.seed, f.inv); }}
         />
       )}
-      {cmd && (
+      {!urgent&&cmd && (
         <CommandPanel
           c={c}
           cmd={cmd.id}
           target={cmd.target}
           onClose={() => setCmd(null)}
-          onDone={(text, scene) => { setCmd(null); onChange(); flash(text); if (scene) onScene(scene); }}
+          onDone={(text, scene) => { setCmd(null);setDecision(text); onChange(); flash(text); if (scene) onScene(scene); }}
         />
       )}
-      {modal === 'gens' && <GeneralsPanel c={c} onChange={onChange} onScene={onScene} onPersuade={(id) => { setModal(null); setCmd({ id: 'persuade', target: id }); }} onClose={() => setModal(null)} />}
-      {modal === 'town' && <TownPanel c={c} onChange={onChange} onClose={() => setModal(null)} />}
-      {modal === 'news' && (
+      {!urgent&&modal === 'gens' && <GeneralsPanel c={c} onChange={onChange} onScene={onScene} onPersuade={(id) => { setModal(null); setCmd({ id: 'persuade', target: id }); }} onClose={() => setModal(null)} />}
+      {!urgent&&modal === 'town' && <TownPanel c={c} onChange={onChange} onClose={() => setModal(null)} />}
+      {!urgent&&modal === 'news' && (
         <Modal title="記録" onClose={() => setModal(null)} className="log-modal">
           <p className="note">
             収入 毎季 {income(c).toLocaleString()}文{upkeepOver ? `（維持費${totalUpkeep(c)}が国力${totalNp(c)}を超え、本来の${grossIncome(c)}文の半分）` : `（国力${totalNp(c)}・維持費${totalUpkeep(c)}）`}・
-            武名 {c.fame}{fame ? `（${fame}で行動+1）` : ''}・戦 {c.stats.battles}（勝ち{c.stats.wins}）・捕らえた将 {c.stats.captured}・討った敵兵 {c.stats.kills.toLocaleString()}・朔 Lv{lordLv(c)}
+            武名 {c.fame}{fame ? `（${fame}で褒賞）` : ''}・戦 {c.stats.battles}（勝ち{c.stats.wins}）・捕らえた将 {c.stats.captured}・討った敵兵 {c.stats.kills.toLocaleString()}・朔 Lv{lordLv(c)}
           </p>
           <button className="small" onClick={() => setModal('titles')}>称号を見る</button>
           <div className="log-list">{[...c.news].reverse().map((n, i) => <div key={i} className={`msg ${n.c ?? ''}`}><small>{turnLabel(n.turn)}</small> {n.t}</div>)}</div>
         </Modal>
       )}
-      {modal === 'titles' && (
+      {!urgent&&modal === 'titles' && (
         <Modal title="称号" onClose={() => setModal('news')}>
           <div className="title-list">
             {TITLES.map((t) => <div key={t.id} className={`title-row ${c.titles[t.id] ? 'got' : ''}`}><b>{c.titles[t.id] ? t.name : '？？？'}</b><small>{t.desc}</small></div>)}
           </div>
         </Modal>
       )}
-      {modal === 'menu' && (
+      {!urgent&&modal === 'menu' && (
         <Modal title="本陣" onClose={() => setModal(null)}>
           <div className="menu-list">
             <button onClick={() => setModal('help')}>遊び方</button>
             <button onClick={() => setModal('settings')}>設定</button>
+            <button onClick={() => setModal('news')}>戦いと国取りの記録</button>
+            <button onClick={() => {onSettings({...settings,guideSeen:false});setModal(null);}}>国取りの案内をもう一度見る</button>
             <button onClick={() => { setModal(null); onTitle(); }}>タイトルへ（自動で保存されています）</button>
           </div>
         </Modal>
       )}
-      {modal === 'help' && <Modal title="遊び方" onClose={() => setModal('menu')} wide><HelpBody /></Modal>}
-      {modal === 'settings' && <Modal title="設定" onClose={() => setModal('menu')}><SettingsBody settings={settings} onChange={onSettings} /></Modal>}
-      {modal === 'end' && (
+      {!urgent&&modal === 'help' && <Modal title="遊び方" onClose={() => setModal('menu')} wide><HelpBody /></Modal>}
+      {!urgent&&modal === 'settings' && <Modal title="設定" onClose={() => setModal('menu')}><SettingsBody settings={settings} onChange={onSettings} /></Modal>}
+      {!urgent&&modal === 'end' && (
         <Modal title="季節を進めますか？" onClose={() => setModal(null)}>
           <p className="reserve">防衛に残せる武将 {Object.values(c.gens).filter(g=>canAct(c,g.id)&&g.troops>0).length}名・兵{Object.values(c.gens).filter(g=>canAct(c,g.id)&&g.troops>0).reduce((n,g)=>n+g.troops,0).toLocaleString()}。攻撃や内政で使った武将は敵の手番でも活動できません。</p>
           {c.fans > 0 && <p>まだ行動が{c.fans}回残っています。</p>}

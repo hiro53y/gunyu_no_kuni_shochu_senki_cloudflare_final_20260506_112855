@@ -1,6 +1,7 @@
+import {reserve} from '../campaign/actionGuide';
 // 陣立て：出す武将（6部隊まで）を前衛・後衛の枠に置く。敵の顔ぶれと戦場も見える。朔の部隊が壊滅すると終わり
 import { activity, canAct } from '../campaign/strategy';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { regionDef } from '../content/sengoku';
 import { LORD } from '../content/generals';
 import { KINDS, battleSkill } from '../battle/kinds';
@@ -79,7 +80,9 @@ export function Formation({ c, mode, region, seed, inv, onGo, onClose }: { c: Ca
     }
     setSel(k);
   };
+  const departing=useRef(false);
   const go = () => {
+    if(departing.current)return;departing.current=true;
     const party: Placement[] = Object.entries(slots).map(([k, gen]) => ({ gen, row: Number(k[0]) as 0 | 1, slot: Number(k[1]) as 0 | 1 | 2 }));
     playSe('menu');
     onGo(party);
@@ -115,6 +118,7 @@ export function Formation({ c, mode, region, seed, inv, onGo, onClose }: { c: Ca
             <div className="fg-arrow">▶<small>敵</small></div>
           </div>
           <p className="note">{sel ? '置く武将を下から選ぶか、入れ替える枠を押してください。' : `枠を押して選び、武将を置く・入れ替える。武士・足軽・鉄砲・僧兵は前衛の列からしか攻撃できない。足軽は同じ列の味方をかばう。戦場：${GROUND_NAME[ground]}${mode === 'defense' ? '（守る側の上乗せあり）' : ground !== 'field' ? '（敵に守りの上乗せ）' : ''}`}</p>
+          <p className="reserve small-note">出陣後の防衛要員 {reserve(c,[...placedIds]).count}人・兵{reserve(c,[...placedIds]).troops.toLocaleString()}{reserve(c,[...placedIds]).count===0?'。この季節に敵襲が来ても部隊を出せません。':''}</p>
           {lordPlaced && <p className="bad small-note">朔の部隊が壊滅すると暁ノ家はおしまい（季節の始めからやり直し）。</p>}
           <div className="gen-pick">
             {ready.sort((a, b) => (a.id === LORD ? -1 : b.id === LORD ? 1 : b.lv - a.lv)).map((g) => {
