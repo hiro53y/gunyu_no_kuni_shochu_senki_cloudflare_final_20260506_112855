@@ -21,7 +21,9 @@
 スクリーンショットとログは作業フォルダ `C:/Users/hiro_/Documents/Codex/2026-10-15/g/outputs/gunyu-v51-*`。
 
 ## 公開・未確認
-- [ ] 公開ファイルと版/PWA更新ファイルを読み戻す。
+- [x] 最終6eae8edのビルド成功、最終JS index-2yaSfAhX.js / CSS index-DL87dUTh.css / sw.js / manifest / icon一致。公開ブラウザーで補足文字のコントラスト調整を確認。
+- [x] dcc21edのCloudflare Pagesビルド成功。公開v5.1とJS/CSS/sw.js/manifest/icon/地図/戦場背景7ファイルの一致。旧中断合戦の再開→大技→勝利→本陣→次季節→開戦準備、コンソールerror/warn0。
+- [x] 前版コミットとの151ファイルSHA256照合で画像/manifest/iconの変更0。
 Pixel 9a実機の操作感・発熱・インストール済みPWA更新、人による全ルートの長時間プレイは未確認。端末内の実セーブデータは読み取っていない。
 
 ---

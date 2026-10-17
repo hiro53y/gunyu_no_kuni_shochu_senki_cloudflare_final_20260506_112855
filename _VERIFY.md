@@ -1,8 +1,8 @@
 # v5.1 検証（2026-10-17）
 
-215件すべて合格、実行基盤エラー0、終了コード0。3,000戦と3ルート各20seed・4,393戦を含む。型チェックと本番ビルド成功。JS index-ekR90qQM.js / CSS index-D2gQVoQd.css。Service Workerキャッシュ gunyu-no-kuni-v11-conquest-effects-v51。
+215件すべて合格、実行基盤エラー0、終了コード0。3,000戦と3ルート各20seed・4,393戦を含む。型チェックと本番ビルド成功。最終JS index-2yaSfAhX.js / CSS index-DL87dUTh.css。Service Workerキャッシュ gunyu-no-kuni-v11-conquest-effects-v51。
 
-11兵種の局所演出、2,000連続効果/イベント、勢力単位の開戦準備と旧進捗保持、地図操作の通しを確認。詳細と未確認事項はtests/test_checklist.md。公開の読み戻しは次の記録へ追記する。以下は旧版履歴。
+11兵種の局所演出、2,000連続効果/イベント、勢力単位の開戦準備と旧進捗保持、地図操作の通しを確認。詳細と未確認事項はtests/test_checklist.md。実装dcc21ed・補足文字コントラスト調整6eae8edともCloudflare Pages check成功。最終JS/CSS/sw.js/manifest/iconの5ファイルがdistと一致。公開v5.1の旧中断合戦→大技→勝利→本陣→季節更新→開戦準備を確認。最終補足文字色rgb(81,64,29)を公開ブラウザーで再確認。以下は旧版履歴。
 
 # v5.0.1 公開検証（2026-10-17）
 

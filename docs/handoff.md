@@ -1,6 +1,6 @@
 # 引継ぎ v5.1
 
-v5.1の実装・ローカル検証完了（2026-10-17）。既存GitHub main連携のCloudflare Pagesで同じURLへ公開する。仕様はdocs/spec.md、検証はtests/test_checklist.mdと_VERIFY.md。CLAUDE向け文書は変更しない。
+v5.1完了・公開中（2026-10-17）。実装dcc21edのCloudflare Pagesビルド成功、既存URLのv5.1と配信7ファイルの一致、旧版の中断合戦再開→勝利→地図→開戦準備を確認。6eae8edで主操作の補足文字のコントラストを調整し、Cloudflareビルドと最終5ファイル一致、公開ブラウザーで文字色を確認済み。仕様はdocs/spec.md、検証はtests/test_checklist.mdと_VERIFY.md。CLAUDE向け文書は変更しない。
 
 戦闘描画はbattle/view/presentation.tsの11兵種/全技プロフィール、field.tsの演出進行と予算・待機解除に分離。元256pxセル・DPR描画・固定戦場を維持する。戦闘エンジンの計算と乱数は変更していない。元の立ち絵94点とv5素材48点は変更なし。
 
